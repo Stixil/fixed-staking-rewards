@@ -1,0 +1,27 @@
+name = "fixed-staking-rewards"
+version = "1.0.2"
+description = "Fixed staking rewards contract for ERC20 tokens"
+
+[var.main]
+owner = "0xEb3107117FEAd7de89Cd14D463D340A2E6917769"
+rewardsToken = "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F"
+stakingToken = "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51"
+rewardsTokenFeed = "0xDC3EA94CD0AC27d9A86C180091e7f78C683d3699"
+rewardYieldForYear = "<%= parseEther('0.5') %>"
+
+[deploy.FixedStakingRewards]
+artifact = "FixedStakingRewards"
+args = [
+    "<%= settings.owner %>",
+    "<%= settings.rewardsToken %>",
+    "<%= settings.stakingToken %>",
+    "<%= settings.rewardsTokenFeed %>",
+]
+
+[invoke.FixedStakingRewards_setRewardYieldForYear]
+target = ["FixedStakingRewards"]
+fromCall.func = "owner"
+func = "setRewardYieldForYear"
+args = [
+    "<%= settings.rewardYieldForYear %>"
+]

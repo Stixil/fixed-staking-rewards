@@ -1,0 +1,20 @@
+{
+  "name": "fixed-staking-rewards",
+  "version": "0.0.0",
+  "main": "index.js",
+  "repository": "synthetixio/fixed-staking-rewards",
+  "author": "Synthetix",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "start": "cannon build --keep-alive --dry-run --impersonate-all --anvil.port 8545 --chain-id 1 --rpc-url https://mainnet.infura.io/v3/$INFURA_API_KEY",
+    "build": "cannon build --dry-run --impersonate-all --anvil.port 8545 --chain-id 1 --rpc-url https://mainnet.infura.io/v3/$INFURA_API_KEY",
+    "lint": "forge fmt",
+    "test": "forge test -vvv",
+    "cov": "./cov.sh"
+  },
+  "devDependencies": {
+    "@usecannon/cli": "2.24.2"
+  },
+  "packageManager": "yarn@4.9.2"
+}
