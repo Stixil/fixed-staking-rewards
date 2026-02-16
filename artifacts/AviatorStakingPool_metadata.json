@@ -2828,19 +2828,11 @@
 			]
 		},
 		"src/AviatorStakingPool.sol": {
-			"keccak256": "0x970c1eea8e12c213f94970fd8b5f5b262831c531eabb40ac07b0cd1cc372c2a6",
+			"keccak256": "0xc0f9a0ed4c090a30016d1b5f5c3e1c5350de0649ee2feda06a5a65c7561cea31",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://24817402ba73e1d26bc9d4ec17b8230f095fd7cc02559a961fa6f38edab66d55",
-				"dweb:/ipfs/QmcckFcQ44eQPWhc1jxk7PLXvwWunGoL9gWekMjAqJo7i7"
-			]
-		},
-		"src/interfaces/IStakingRewards.sol": {
-			"keccak256": "0x68c5e1e490b41cd526677c5556734da94d572f483ea1b67c95b437599bd48849",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://e3eb710fecee80a7f652986b4beda15cb937f8e990b46842a955391ae3e1ce5c",
-				"dweb:/ipfs/QmX53KuDvgwtL1VhMXLeNfTVaHVrgfkECNhMQMK1YKzFAL"
+				"bzz-raw://52a6a02f3a0237947c37ddfc1c4ae5cac16a6289480fe52b845b274dc83f656d",
+				"dweb:/ipfs/QmfY3UA4eQpTpEE11pTKxjGswpfRSfkaRnruKWm66t4gxa"
 			]
 		}
 	},

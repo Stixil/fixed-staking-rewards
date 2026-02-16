@@ -6,9 +6,6 @@ import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
-
-// Inheritance
-import "./interfaces/IStakingRewards.sol";
 import "./AviatorRewardsVault.sol";
 
 /* ========== CUSTOM ERRORS ========== */
