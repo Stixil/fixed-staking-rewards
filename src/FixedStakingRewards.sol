@@ -26,7 +26,7 @@ error InvalidStakeId(uint256 stakeId);
 error TokenNotWhitelisted(address token);
 error TokenAlreadyWhitelisted(address token);
 
-contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard, AccessControlEnumerable {
+contract FixedStakingRewards is ERC20Pausable, ReentrancyGuard, AccessControlEnumerable {
     using SafeERC20 for IERC20;
 
     /* ========== ROLES ========== */
@@ -153,7 +153,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
     /// @notice Returns the total rewards earned by an account (legacy interface compatibility)
     /// @param account The address to check rewards for
     /// @return The amount of rewards earned for the first whitelisted token
-    function earned(address account) public view override returns (uint256) {
+    function earned(address account) public view returns (uint256) {
         if (rewardTokensList.length > 0) {
             return earned(account, rewardTokensList[0]);
         }
@@ -162,7 +162,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /// @notice Gets the total reward amount for a 14-day period (legacy interface)
     /// @return The reward amount for the duration
-    function getRewardForDuration() public view override returns (uint256) {
+    function getRewardForDuration() public view returns (uint256) {
         if (rewardTokensList.length > 0) {
             return getActiveRewardRate(rewardTokensList[0]) * 14 days;
         }
@@ -266,7 +266,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /// @notice Stake tokens with default minimum lock period (interface compatibility)
     /// @param amount The amount of tokens to stake
-    function stake(uint256 amount) external override nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
+    function stake(uint256 amount) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         _stakeWithLock(msg.sender, amount, minimumLockDuration);
     }
 
@@ -312,7 +312,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /// @notice Withdraw unlocked staked tokens
     /// @param amount The amount of tokens to withdraw
-    function withdraw(uint256 amount) public override nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
+    function withdraw(uint256 amount) public nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         require(amount > 0, "Cannot withdraw 0");
         
         uint256 availableToWithdraw = getUnlockedBalance(msg.sender);
@@ -403,7 +403,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
     }
 
     /// @notice Claim accumulated rewards (legacy interface - claims first whitelisted token)
-    function getReward() public override nonReentrant whenNotPaused whenNotBlacklisted {
+    function getReward() public nonReentrant whenNotPaused whenNotBlacklisted {
         if (rewardTokensList.length > 0) {
             // For legacy compatibility, just update rewards without claiming
             // Users should use getRewardForToken or getAllRewards
@@ -439,7 +439,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
     }
 
     /// @notice Withdraw all unlocked staked tokens and claim all rewards
-    function exit() external override whenNotPaused whenNotBlacklisted {
+    function exit() external whenNotPaused whenNotBlacklisted {
         uint256 unlockedBalance = getUnlockedBalance(msg.sender);
         if (unlockedBalance > 0) {
             withdraw(unlockedBalance);

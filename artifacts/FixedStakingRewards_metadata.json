@@ -14,12 +14,12 @@
 					},
 					{
 						"internalType": "address",
-						"name": "_rewardsToken",
+						"name": "_stakingToken",
 						"type": "address"
 					},
 					{
 						"internalType": "address",
-						"name": "_stakingToken",
+						"name": "_vault",
 						"type": "address"
 					}
 				],
@@ -235,6 +235,28 @@
 				"type": "error"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "TokenAlreadyWhitelisted",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "TokenNotWhitelisted",
+				"type": "error"
+			},
+			{
 				"anonymous": false,
 				"inputs": [
 					{
@@ -295,7 +317,39 @@
 						"type": "uint256"
 					}
 				],
-				"name": "ClaimFeeSet",
+				"name": "ClaimFeeETHSet",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "recipient",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "EmergencyWithdrawStakes",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "feeReceiver",
+						"type": "address"
+					}
+				],
+				"name": "FeeReceiverSet",
 				"type": "event"
 			},
 			{
@@ -328,9 +382,27 @@
 				"anonymous": false,
 				"inputs": [
 					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
 						"indexed": false,
 						"internalType": "uint256",
-						"name": "reward",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "duration",
+						"type": "uint256"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "rewardRate",
 						"type": "uint256"
 					}
 				],
@@ -347,6 +419,12 @@
 						"type": "address"
 					},
 					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
 						"indexed": false,
 						"internalType": "uint256",
 						"name": "reward",
@@ -360,26 +438,26 @@
 				"anonymous": false,
 				"inputs": [
 					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "rewardRate",
-						"type": "uint256"
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
 					}
 				],
-				"name": "RewardRateSet",
+				"name": "RewardTokenAdded",
 				"type": "event"
 			},
 			{
 				"anonymous": false,
 				"inputs": [
 					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "timestampAvailable",
-						"type": "uint256"
+						"indexed": true,
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
 					}
 				],
-				"name": "RewardsMadeAvailable",
+				"name": "RewardTokenRemoved",
 				"type": "event"
 			},
 			{
@@ -601,6 +679,19 @@
 				"inputs": [
 					{
 						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "addRewardToken",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
 						"name": "owner",
 						"type": "address"
 					},
@@ -698,7 +789,7 @@
 			},
 			{
 				"inputs": [],
-				"name": "claimFee",
+				"name": "claimFeeETH",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -745,23 +836,48 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "tokenAddress",
+						"name": "account",
 						"type": "address"
 					},
 					{
 						"internalType": "address",
-						"name": "recipient",
+						"name": "token",
 						"type": "address"
-					},
+					}
+				],
+				"name": "earned",
+				"outputs": [
 					{
 						"internalType": "uint256",
-						"name": "amount",
+						"name": "",
 						"type": "uint256"
 					}
 				],
-				"name": "emergencyWithdrawERC20",
-				"outputs": [],
-				"stateMutability": "nonpayable",
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "earnedAll",
+				"outputs": [
+					{
+						"internalType": "address[]",
+						"name": "tokens",
+						"type": "address[]"
+					},
+					{
+						"internalType": "uint256[]",
+						"name": "amounts",
+						"type": "uint256[]"
+					}
+				],
+				"stateMutability": "view",
 				"type": "function"
 			},
 			{
@@ -806,10 +922,67 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "recipient",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					}
+				],
+				"name": "emergencyWithdrawStakes",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "exit",
 				"outputs": [],
 				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "feeReceiver",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "getActiveRewardRate",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "getAllRewards",
+				"outputs": [],
+				"stateMutability": "payable",
 				"type": "function"
 			},
 			{
@@ -852,13 +1025,64 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "getRewardsPerDay",
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "getRewardForToken",
+				"outputs": [],
+				"stateMutability": "payable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "getRewardSchedules",
 				"outputs": [
 					{
-						"internalType": "uint256",
-						"name": "rewardsPerDay",
-						"type": "uint256"
+						"components": [
+							{
+								"internalType": "uint256",
+								"name": "rewardRate",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "startTime",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "endTime",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "totalSupplied",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "pausedAt",
+								"type": "uint256"
+							},
+							{
+								"internalType": "uint256",
+								"name": "totalPausedTime",
+								"type": "uint256"
+							}
+						],
+						"internalType": "struct FixedStakingRewards.RewardSchedule[]",
+						"name": "",
+						"type": "tuple[]"
 					}
 				],
 				"stateMutability": "view",
@@ -1061,6 +1285,19 @@
 				"type": "function"
 			},
 			{
+				"inputs": [],
+				"name": "getWhitelistedRewardTokens",
+				"outputs": [
+					{
+						"internalType": "address[]",
+						"name": "",
+						"type": "address[]"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "bytes32",
@@ -1142,7 +1379,26 @@
 			},
 			{
 				"inputs": [],
-				"name": "lastUpdateTime",
+				"name": "lastTotalSupplyZeroTime",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "lastUpdateTimePerToken",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -1200,15 +1456,14 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "reclaim",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "releaseRewards",
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
+				"name": "removeRewardToken",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1250,34 +1505,14 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					}
+				],
 				"name": "rewardPerToken",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "rewardPerTokenStored",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "rewardRate",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -1296,7 +1531,7 @@
 						"type": "address"
 					}
 				],
-				"name": "rewards",
+				"name": "rewardPerTokenStoredPerToken",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -1308,12 +1543,48 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "rewardsAvailableDate",
-				"outputs": [
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					},
 					{
 						"internalType": "uint256",
 						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "rewardSchedules",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "rewardRate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "startTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "endTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalSupplied",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "pausedAt",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "totalPausedTime",
 						"type": "uint256"
 					}
 				],
@@ -1321,11 +1592,17 @@
 				"type": "function"
 			},
 			{
-				"inputs": [],
-				"name": "rewardsToken",
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "rewardTokensList",
 				"outputs": [
 					{
-						"internalType": "contract IERC20",
+						"internalType": "address",
 						"name": "",
 						"type": "address"
 					}
@@ -1336,12 +1613,49 @@
 			{
 				"inputs": [
 					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "rewardsPerToken",
+				"outputs": [
+					{
 						"internalType": "uint256",
-						"name": "_fee",
+						"name": "",
 						"type": "uint256"
 					}
 				],
-				"name": "setClaimFee",
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "_claimFeeETH",
+						"type": "uint256"
+					}
+				],
+				"name": "setClaimFeeETH",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "_feeReceiver",
+						"type": "address"
+					}
+				],
+				"name": "setFeeReceiver",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1355,19 +1669,6 @@
 					}
 				],
 				"name": "setMinimumLockDuration",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "_rewardRate",
-						"type": "uint256"
-					}
-				],
-				"name": "setRewardRate",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1419,8 +1720,18 @@
 			{
 				"inputs": [
 					{
+						"internalType": "address",
+						"name": "token",
+						"type": "address"
+					},
+					{
 						"internalType": "uint256",
 						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "duration",
 						"type": "uint256"
 					}
 				],
@@ -1553,9 +1864,14 @@
 						"internalType": "address",
 						"name": "",
 						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
 					}
 				],
-				"name": "userRewardPerTokenPaid",
+				"name": "userRewardPerTokenPaidPerToken",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -1633,6 +1949,51 @@
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "vault",
+				"outputs": [
+					{
+						"internalType": "contract RewardsVault",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "wasTotalSupplyZero",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "whitelistedRewardTokens",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
 					}
 				],
 				"stateMutability": "view",
@@ -1775,6 +2136,11 @@
 			},
 			"kind": "dev",
 			"methods": {
+				"addRewardToken(address)": {
+					"params": {
+						"token": "The token address to whitelist"
+					}
+				},
 				"allowance(address,address)": {
 					"details": "Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called."
 				},
@@ -1792,8 +2158,8 @@
 				"constructor": {
 					"params": {
 						"_admin": "The address that will have admin role",
-						"_rewardsToken": "The token used for rewards",
-						"_stakingToken": "The token users will stake"
+						"_stakingToken": "The token users will stake",
+						"_vault": "The rewards vault address"
 					}
 				},
 				"decimals()": {
@@ -1804,14 +2170,25 @@
 						"account": "The address to check rewards for"
 					},
 					"returns": {
+						"_0": "The amount of rewards earned for the first whitelisted token"
+					}
+				},
+				"earned(address,address)": {
+					"params": {
+						"account": "The address to check rewards for",
+						"token": "The reward token address"
+					},
+					"returns": {
 						"_0": "The amount of rewards earned"
 					}
 				},
-				"emergencyWithdrawERC20(address,address,uint256)": {
+				"earnedAll(address)": {
 					"params": {
-						"amount": "Amount of tokens to withdraw",
-						"recipient": "Address to receive the tokens",
-						"tokenAddress": "The ERC20 token address"
+						"account": "The address to check"
+					},
+					"returns": {
+						"amounts": "Array of earned amounts",
+						"tokens": "Array of token addresses"
 					}
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
@@ -1827,6 +2204,20 @@
 						"recipient": "Address to receive the ETH"
 					}
 				},
+				"emergencyWithdrawStakes(address,uint256)": {
+					"params": {
+						"amount": "Amount of tokens to withdraw",
+						"recipient": "Address to receive the tokens"
+					}
+				},
+				"getActiveRewardRate(address)": {
+					"params": {
+						"token": "The reward token address"
+					},
+					"returns": {
+						"_0": "Total active reward rate"
+					}
+				},
 				"getLockedBalance(address)": {
 					"params": {
 						"account": "The address to check"
@@ -1840,9 +2231,17 @@
 						"_0": "The reward amount for the duration"
 					}
 				},
-				"getRewardsPerDay()": {
+				"getRewardForToken(address)": {
+					"params": {
+						"token": "The reward token to claim"
+					}
+				},
+				"getRewardSchedules(address)": {
+					"params": {
+						"token": "The reward token address"
+					},
 					"returns": {
-						"rewardsPerDay": "The amount of rewards distributed per day"
+						"_0": "Array of reward schedules"
 					}
 				},
 				"getRoleAdmin(bytes32)": {
@@ -1890,6 +2289,11 @@
 						"_0": "Array of stake positions"
 					}
 				},
+				"getWhitelistedRewardTokens()": {
+					"returns": {
+						"_0": "Array of whitelisted token addresses"
+					}
+				},
 				"grantRole(bytes32,address)": {
 					"details": "Grants `role` to `account`. If `account` had not been already granted `role`, emits a {RoleGranted} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleGranted} event."
 				},
@@ -1910,30 +2314,38 @@
 				"paused()": {
 					"details": "Returns true if the contract is paused, and false otherwise."
 				},
+				"removeRewardToken(address)": {
+					"params": {
+						"token": "The token address to remove"
+					}
+				},
 				"renounceRole(bytes32,address)": {
 					"details": "Revokes `role` from the calling account. Roles are often managed via {grantRole} and {revokeRole}: this function's purpose is to provide a mechanism for accounts to lose their privileges if they are compromised (such as when a trusted device is misplaced). If the calling account had been revoked `role`, emits a {RoleRevoked} event. Requirements: - the caller must be `callerConfirmation`. May emit a {RoleRevoked} event."
 				},
 				"revokeRole(bytes32,address)": {
 					"details": "Revokes `role` from `account`. If `account` had been granted `role`, emits a {RoleRevoked} event. Requirements: - the caller must have ``role``'s admin role. May emit a {RoleRevoked} event."
 				},
-				"rewardPerToken()": {
+				"rewardPerToken(address)": {
+					"params": {
+						"token": "The reward token address"
+					},
 					"returns": {
 						"_0": "The reward per token value"
 					}
 				},
-				"setClaimFee(uint256)": {
+				"setClaimFeeETH(uint256)": {
 					"params": {
-						"_fee": "Fee in basis points (e.g., 5 = 0.5%)"
+						"_claimFeeETH": "The new claim fee in wei"
+					}
+				},
+				"setFeeReceiver(address)": {
+					"params": {
+						"_feeReceiver": "The new fee receiver address"
 					}
 				},
 				"setMinimumLockDuration(uint256)": {
 					"params": {
 						"_minimumLockDuration": "The new minimum lock duration in seconds"
-					}
-				},
-				"setRewardRate(uint256)": {
-					"params": {
-						"_rewardRate": "The new reward rate in wei per second"
 					}
 				},
 				"stake(uint256)": {
@@ -1947,9 +2359,11 @@
 						"lock": "The lock duration in seconds (must be at least minimumLockDuration)"
 					}
 				},
-				"supplyRewards(uint256)": {
+				"supplyRewards(address,uint256,uint256)": {
 					"params": {
-						"amount": "Amount of reward tokens to add"
+						"amount": "Total amount of reward tokens to distribute",
+						"duration": "Duration in seconds over which to distribute rewards",
+						"token": "The reward token address"
 					}
 				},
 				"symbol()": {
@@ -1985,17 +2399,23 @@
 		"userdoc": {
 			"kind": "user",
 			"methods": {
+				"addRewardToken(address)": {
+					"notice": "Add a token to the rewards whitelist"
+				},
 				"blacklistWallet(address)": {
-					"notice": "Add an address to the blacklist and return their staked tokens (forfeit rewards)"
+					"notice": "Add an address to the blacklist and return their staked tokens (forfeit all rewards)"
 				},
 				"constructor": {
-					"notice": "Initializes the staking contract with token addresses"
+					"notice": "Initializes the staking contract"
 				},
 				"earned(address)": {
-					"notice": "Returns the total rewards earned by an account"
+					"notice": "Returns the total rewards earned by an account (legacy interface compatibility)"
 				},
-				"emergencyWithdrawERC20(address,address,uint256)": {
-					"notice": "Emergency withdraw ERC20 tokens from contract"
+				"earned(address,address)": {
+					"notice": "Returns the total rewards earned by an account for a specific token"
+				},
+				"earnedAll(address)": {
+					"notice": "Get earned rewards for all whitelisted tokens"
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
 					"notice": "Emergency withdraw ERC721 NFTs from contract"
@@ -2003,20 +2423,32 @@
 				"emergencyWithdrawETH(address,uint256)": {
 					"notice": "Emergency withdraw ETH from contract"
 				},
+				"emergencyWithdrawStakes(address,uint256)": {
+					"notice": "Emergency withdraw staking tokens from contract"
+				},
 				"exit()": {
 					"notice": "Withdraw all unlocked staked tokens and claim all rewards"
+				},
+				"getActiveRewardRate(address)": {
+					"notice": "Get the active reward rate for a token (sum of all active schedules)"
+				},
+				"getAllRewards()": {
+					"notice": "Claim all rewards across all whitelisted tokens (single ETH fee)"
 				},
 				"getLockedBalance(address)": {
 					"notice": "Get the locked balance for a user"
 				},
 				"getReward()": {
-					"notice": "Claim accumulated rewards (minus any fees)"
+					"notice": "Claim accumulated rewards (legacy interface - claims first whitelisted token)"
 				},
 				"getRewardForDuration()": {
-					"notice": "Gets the total reward amount for a 14-day period"
+					"notice": "Gets the total reward amount for a 14-day period (legacy interface)"
 				},
-				"getRewardsPerDay()": {
-					"notice": "Get the current reward rate in a human-readable format"
+				"getRewardForToken(address)": {
+					"notice": "Claim rewards for a specific token"
+				},
+				"getRewardSchedules(address)": {
+					"notice": "Get all reward schedules for a token"
 				},
 				"getStakePosition(address,uint256)": {
 					"notice": "Get a specific stake position"
@@ -2030,29 +2462,29 @@
 				"getUserStakePositions(address)": {
 					"notice": "Get all stake positions for a user"
 				},
+				"getWhitelistedRewardTokens()": {
+					"notice": "Get all whitelisted reward tokens"
+				},
 				"isBlacklisted(address)": {
 					"notice": "Checks if an address is blacklisted"
 				},
 				"pause()": {
 					"notice": "Pause all contract operations"
 				},
-				"reclaim()": {
-					"notice": "Admin emergency function to shut down contract and recover rewards"
+				"removeRewardToken(address)": {
+					"notice": "Remove a token from the rewards whitelist (prevents new supplies, existing schedules continue)"
 				},
-				"releaseRewards()": {
-					"notice": "Make rewards available for claiming immediately"
+				"rewardPerToken(address)": {
+					"notice": "Calculates the current reward per token for a specific reward token"
 				},
-				"rewardPerToken()": {
-					"notice": "Calculates the current reward per token staked"
+				"setClaimFeeETH(uint256)": {
+					"notice": "Set the ETH claim fee"
 				},
-				"setClaimFee(uint256)": {
-					"notice": "Set the fee percentage for reward claims"
+				"setFeeReceiver(address)": {
+					"notice": "Set the fee receiver address"
 				},
 				"setMinimumLockDuration(uint256)": {
 					"notice": "Set the minimum lock duration"
-				},
-				"setRewardRate(uint256)": {
-					"notice": "Set the reward rate (rewards distributed per second)"
 				},
 				"stake(uint256)": {
 					"notice": "Stake tokens with default minimum lock period (interface compatibility)"
@@ -2060,8 +2492,8 @@
 				"stakeWithBonus(uint256,uint256)": {
 					"notice": "Stake tokens with a custom time lock (with bonus rewards)"
 				},
-				"supplyRewards(uint256)": {
-					"notice": "Add reward tokens to the contract (callable by anyone)"
+				"supplyRewards(address,uint256,uint256)": {
+					"notice": "Supply rewards for a specific token over a duration"
 				},
 				"supportsInterface(bytes4)": {
 					"notice": "Override supportsInterface for AccessControlEnumerable"
@@ -2315,11 +2747,19 @@
 			]
 		},
 		"src/FixedStakingRewards.sol": {
-			"keccak256": "0x3b32ebbb49e244dff4ea5d8309925b8dffea606b3b072327cf6ce3db6a1acbfa",
+			"keccak256": "0xd5ec7198049e2d317b62371dd59c98ab7a771f6652df0d7b9ba235f6ec621afe",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://86063f16b6c455d650d04ee981fb3fd093b6b445a4eabe7770eff9a7c74f1512",
-				"dweb:/ipfs/QmfJc2JXvLwPTKY5Up9fH13N5eNair7vkGxnhGU4hPedg7"
+				"bzz-raw://c6a793b7569753216ca3b44ef5aeede79966d0126439fb9280aee528490c2777",
+				"dweb:/ipfs/Qmad2nNTCuDHx4YVKTs4hSeuzGdvBdSMvtFM8NoCvcQFCw"
+			]
+		},
+		"src/RewardsVault.sol": {
+			"keccak256": "0xa317d464cdbf2e162e5aa8c6680d4dd29b06d3eb904d9dad0068bd07a0e938e7",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://5e2a32cd082485bd997e2b85775b8445a83912a302cc52b7711cc54da43c2195",
+				"dweb:/ipfs/Qmcb6y37HapFEqjntjYbTGhYyKHSegL7bQ5gWnQFHhYdUv"
 			]
 		},
 		"src/interfaces/IStakingRewards.sol": {
