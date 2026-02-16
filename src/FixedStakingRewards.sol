@@ -9,6 +9,7 @@ import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 
 // Inheritance
 import "./interfaces/IStakingRewards.sol";
+import "./RewardsVault.sol";
 
 /* ========== CUSTOM ERRORS ========== */
 
@@ -22,6 +23,8 @@ error LockDurationTooShort(uint256 provided, uint256 minimum);
 error DepositStillLocked(uint256 currentTime, uint256 unlockTime);
 error InsufficientUnlockedBalance(uint256 requested, uint256 available);
 error InvalidStakeId(uint256 stakeId);
+error TokenNotWhitelisted(address token);
+error TokenAlreadyWhitelisted(address token);
 
 contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard, AccessControlEnumerable {
     using SafeERC20 for IERC20;
@@ -40,41 +43,65 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         bool withdrawn;
     }
 
+    /// @notice Reward schedule for a token
+    struct RewardSchedule {
+        uint256 rewardRate; // Tokens per second
+        uint256 startTime;
+        uint256 endTime;
+        uint256 totalSupplied;
+        uint256 pausedAt; // Timestamp when paused (0 if active)
+        uint256 totalPausedTime; // Cumulative pause duration
+    }
+
     /* ========== STATE VARIABLES ========== */
 
-    IERC20 public immutable rewardsToken;
     IERC20 public immutable stakingToken;
-    uint256 public rewardRate = 0; // Rewards distributed per second
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
-    uint256 public rewardsAvailableDate;
-    uint256 public claimFee; // Fee percentage (e.g., 5 for 0.5%)
+    RewardsVault public immutable vault;
+    
     uint256 public minimumLockDuration; // Configurable minimum lock duration
+    uint256 public claimFeeETH; // ETH fee for claiming rewards
+    address public feeReceiver; // Address that receives ETH claim fees
 
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    // Reward token whitelist
+    mapping(address => bool) public whitelistedRewardTokens;
+    address[] public rewardTokensList;
+
+    // Reward schedules per token
+    mapping(address => RewardSchedule[]) public rewardSchedules;
+    mapping(address => uint256) public lastUpdateTimePerToken;
+    mapping(address => uint256) public rewardPerTokenStoredPerToken;
+
+    // User reward tracking per token
+    mapping(address => mapping(address => uint256)) public userRewardPerTokenPaidPerToken;
+    mapping(address => mapping(address => uint256)) public rewardsPerToken;
+
+    // Blacklist
     mapping(address => bool) public blacklist;
+
+    // Staking tracking
     mapping(address => uint256) public userStaked; // Total staked by user
     mapping(address => uint256) public lastStakeTime;
-    
-    // Track individual stake positions
     mapping(address => StakePosition[]) public userStakePositions;
     mapping(address => uint256) public userStakeCount;
 
+    // Pause tracking for when totalSupply == 0
+    uint256 public lastTotalSupplyZeroTime;
+    bool public wasTotalSupplyZero;
+
     /* ========== CONSTRUCTOR ========== */
 
-    /// @notice Initializes the staking contract with token addresses
+    /// @notice Initializes the staking contract
     /// @param _admin The address that will have admin role
-    /// @param _rewardsToken The token used for rewards
     /// @param _stakingToken The token users will stake
-    constructor(address _admin, address _rewardsToken, address _stakingToken)
+    /// @param _vault The rewards vault address
+    constructor(address _admin, address _stakingToken, address _vault)
         ERC20("RewardsStakedAVI", "stAVI")
     {
-        rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
-        rewardsAvailableDate = block.timestamp + 86400 * 365;
+        vault = RewardsVault(_vault);
         minimumLockDuration = 12 weeks; // Default to 12 weeks
-        lastUpdateTime = block.timestamp; // Initialize to deployment time
+        claimFeeETH = 0.005 ether; // Default 0.005 ETH
+        feeReceiver = _admin; // Default fee receiver is admin
         
         // Setup roles
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -84,26 +111,62 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /* ========== VIEWS ========== */
 
-    /// @notice Calculates the current reward per token staked
+    /// @notice Calculates the current reward per token for a specific reward token
+    /// @param token The reward token address
     /// @return The reward per token value
-    function rewardPerToken() public view returns (uint256) {
+    function rewardPerToken(address token) public view returns (uint256) {
         if (totalSupply() == 0) {
-            return rewardPerTokenStored;
+            return rewardPerTokenStoredPerToken[token];
         }
-        return rewardPerTokenStored + (block.timestamp - lastUpdateTime) * rewardRate;
+
+        uint256 activeRate = getActiveRewardRate(token);
+        uint256 timeDelta = block.timestamp - lastUpdateTimePerToken[token];
+        
+        return rewardPerTokenStoredPerToken[token] + (timeDelta * activeRate);
     }
 
-    /// @notice Returns the total rewards earned by an account
+    /// @notice Get the active reward rate for a token (sum of all active schedules)
+    /// @param token The reward token address
+    /// @return Total active reward rate
+    function getActiveRewardRate(address token) public view returns (uint256) {
+        uint256 totalRate = 0;
+        RewardSchedule[] storage schedules = rewardSchedules[token];
+        
+        for (uint256 i = 0; i < schedules.length; i++) {
+            if (block.timestamp >= schedules[i].startTime && block.timestamp < schedules[i].endTime) {
+                totalRate += schedules[i].rewardRate;
+            }
+        }
+        
+        return totalRate;
+    }
+
+    /// @notice Returns the total rewards earned by an account for a specific token
     /// @param account The address to check rewards for
+    /// @param token The reward token address
     /// @return The amount of rewards earned
-    function earned(address account) public view override returns (uint256) {
-        return (balanceOf(account) * (rewardPerToken() - userRewardPerTokenPaid[account])) / 1e18 + rewards[account];
+    function earned(address account, address token) public view returns (uint256) {
+        return (balanceOf(account) * (rewardPerToken(token) - userRewardPerTokenPaidPerToken[account][token])) / 1e18 
+            + rewardsPerToken[account][token];
     }
 
-    /// @notice Gets the total reward amount for a 14-day period
+    /// @notice Returns the total rewards earned by an account (legacy interface compatibility)
+    /// @param account The address to check rewards for
+    /// @return The amount of rewards earned for the first whitelisted token
+    function earned(address account) public view override returns (uint256) {
+        if (rewardTokensList.length > 0) {
+            return earned(account, rewardTokensList[0]);
+        }
+        return 0;
+    }
+
+    /// @notice Gets the total reward amount for a 14-day period (legacy interface)
     /// @return The reward amount for the duration
     function getRewardForDuration() public view override returns (uint256) {
-        return rewardRate * 14 days;
+        if (rewardTokensList.length > 0) {
+            return getActiveRewardRate(rewardTokensList[0]) * 14 days;
+        }
+        return 0;
     }
 
     /// @notice Checks if an address is blacklisted
@@ -170,25 +233,47 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         return userStakePositions[account].length;
     }
 
-    /// @notice Get the current reward rate in a human-readable format
-    /// @return rewardsPerDay The amount of rewards distributed per day
-    function getRewardsPerDay() external view returns (uint256 rewardsPerDay) {
-        return rewardRate * 1 days;
+    /// @notice Get all whitelisted reward tokens
+    /// @return Array of whitelisted token addresses
+    function getWhitelistedRewardTokens() external view returns (address[] memory) {
+        return rewardTokensList;
+    }
+
+    /// @notice Get all reward schedules for a token
+    /// @param token The reward token address
+    /// @return Array of reward schedules
+    function getRewardSchedules(address token) external view returns (RewardSchedule[] memory) {
+        return rewardSchedules[token];
+    }
+
+    /// @notice Get earned rewards for all whitelisted tokens
+    /// @param account The address to check
+    /// @return tokens Array of token addresses
+    /// @return amounts Array of earned amounts
+    function earnedAll(address account) external view returns (address[] memory tokens, uint256[] memory amounts) {
+        tokens = new address[](rewardTokensList.length);
+        amounts = new uint256[](rewardTokensList.length);
+        
+        for (uint256 i = 0; i < rewardTokensList.length; i++) {
+            tokens[i] = rewardTokensList[i];
+            amounts[i] = earned(account, rewardTokensList[i]);
+        }
+        
+        return (tokens, amounts);
     }
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     /// @notice Stake tokens with default minimum lock period (interface compatibility)
     /// @param amount The amount of tokens to stake
-    function stake(uint256 amount) external override nonReentrant updateReward(msg.sender) whenNotPaused whenNotBlacklisted {
-        // Call the lock version with minimum lock duration
+    function stake(uint256 amount) external override nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         _stakeWithLock(msg.sender, amount, minimumLockDuration);
     }
 
     /// @notice Stake tokens with a custom time lock (with bonus rewards)
     /// @param amount The amount of tokens to stake
     /// @param lock The lock duration in seconds (must be at least minimumLockDuration)
-    function stakeWithBonus(uint256 amount, uint256 lock) external nonReentrant updateReward(msg.sender) whenNotPaused whenNotBlacklisted {
+    function stakeWithBonus(uint256 amount, uint256 lock) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         _stakeWithLock(msg.sender, amount, lock);
     }
 
@@ -227,7 +312,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /// @notice Withdraw unlocked staked tokens
     /// @param amount The amount of tokens to withdraw
-    function withdraw(uint256 amount) public override nonReentrant updateReward(msg.sender) whenNotPaused whenNotBlacklisted {
+    function withdraw(uint256 amount) public override nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         require(amount > 0, "Cannot withdraw 0");
         
         uint256 availableToWithdraw = getUnlockedBalance(msg.sender);
@@ -268,7 +353,7 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /// @notice Withdraw a specific stake position by ID
     /// @param stakeId The ID of the stake position to withdraw
-    function withdrawStakePosition(uint256 stakeId) external nonReentrant updateReward(msg.sender) whenNotPaused whenNotBlacklisted {
+    function withdrawStakePosition(uint256 stakeId) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
         if (stakeId >= userStakePositions[msg.sender].length) {
             revert InvalidStakeId(stakeId);
         }
@@ -296,26 +381,60 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         emit Withdrawn(msg.sender, amount);
     }
 
-    /// @notice Claim accumulated rewards (minus any fees)
-    function getReward() public override nonReentrant updateReward(msg.sender) whenNotPaused whenNotBlacklisted {
-        uint256 reward = rewards[msg.sender];
+    /// @notice Claim rewards for a specific token
+    /// @param token The reward token to claim
+    function getRewardForToken(address token) public payable nonReentrant updateRewardForToken(token, msg.sender) whenNotPaused whenNotBlacklisted {
+        require(msg.value >= claimFeeETH, "Insufficient claim fee");
+        
+        uint256 reward = rewardsPerToken[msg.sender][token];
         if (reward > 0) {
-            uint256 feeAmount = (reward * claimFee) / 1000; // Calculate fee (0.1% to 10%)
-            uint256 netReward = reward - feeAmount;
+            rewardsPerToken[msg.sender][token] = 0;
+            
+            // Pay reward from vault
+            vault.payReward(msg.sender, token, reward);
+            
+            emit RewardPaid(msg.sender, token, reward);
+        }
+        
+        // Send ETH fee to fee receiver
+        if (msg.value > 0) {
+            payable(feeReceiver).transfer(msg.value);
+        }
+    }
 
-            // Reset rewards before transfer
-            rewards[msg.sender] = 0;
+    /// @notice Claim accumulated rewards (legacy interface - claims first whitelisted token)
+    function getReward() public override nonReentrant whenNotPaused whenNotBlacklisted {
+        if (rewardTokensList.length > 0) {
+            // For legacy compatibility, just update rewards without claiming
+            // Users should use getRewardForToken or getAllRewards
+            _updateRewardForToken(rewardTokensList[0], msg.sender);
+        }
+    }
 
-            // Transfer fee to DEFAULT_ADMIN_ROLE holder
-            if (feeAmount > 0) {
-                address admin = getRoleMember(DEFAULT_ADMIN_ROLE, 0);
-                rewardsToken.safeTransfer(admin, feeAmount);
+    /// @notice Claim all rewards across all whitelisted tokens (single ETH fee)
+    function getAllRewards() external payable nonReentrant whenNotPaused whenNotBlacklisted {
+        require(msg.value >= claimFeeETH, "Insufficient claim fee");
+        
+        bool claimedAny = false;
+        
+        for (uint256 i = 0; i < rewardTokensList.length; i++) {
+            address token = rewardTokensList[i];
+            if (whitelistedRewardTokens[token]) {
+                _updateRewardForToken(token, msg.sender);
+                
+                uint256 reward = rewardsPerToken[msg.sender][token];
+                if (reward > 0) {
+                    rewardsPerToken[msg.sender][token] = 0;
+                    vault.payReward(msg.sender, token, reward);
+                    emit RewardPaid(msg.sender, token, reward);
+                    claimedAny = true;
+                }
             }
-
-            // Transfer net reward to user
-            rewardsToken.safeTransfer(msg.sender, netReward);
-
-            emit RewardPaid(msg.sender, netReward);
+        }
+        
+        // Send ETH fee to fee receiver
+        if (msg.value > 0 && claimedAny) {
+            payable(feeReceiver).transfer(msg.value);
         }
     }
 
@@ -325,56 +444,72 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         if (unlockedBalance > 0) {
             withdraw(unlockedBalance);
         }
-        getReward();
-    }
-
-    /// @notice Admin emergency function to shut down contract and recover rewards
-    function reclaim() external onlyRole(ADMIN_ROLE) {
-        // contract is effectively shut down
-        rewardsAvailableDate = block.timestamp;
-        rewardRate = 0;
-        
-        // Transfer to DEFAULT_ADMIN_ROLE holder
-        address admin = getRoleMember(DEFAULT_ADMIN_ROLE, 0);
-        rewardsToken.safeTransfer(admin, rewardsToken.balanceOf(address(this)));
+        // Note: getReward() is legacy, users should call getAllRewards() separately with ETH
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    /// @notice Emergency withdraw ETH from contract
-    /// @param recipient Address to receive the ETH
-    /// @param amount Amount of ETH to withdraw
-    function emergencyWithdrawETH(address payable recipient, uint256 amount) external onlyRole(ADMIN_ROLE) {
-        require(address(this).balance >= amount, "Insufficient ETH balance");
-        recipient.transfer(amount);
+    /// @notice Add a token to the rewards whitelist
+    /// @param token The token address to whitelist
+    function addRewardToken(address token) external onlyRole(ADMIN_ROLE) {
+        require(token != address(0), "Invalid token address");
+        if (whitelistedRewardTokens[token]) {
+            revert TokenAlreadyWhitelisted(token);
+        }
+        
+        whitelistedRewardTokens[token] = true;
+        rewardTokensList.push(token);
+        lastUpdateTimePerToken[token] = block.timestamp;
+        
+        emit RewardTokenAdded(token);
     }
 
-    /// @notice Emergency withdraw ERC20 tokens from contract
-    /// @param tokenAddress The ERC20 token address
-    /// @param recipient Address to receive the tokens
-    /// @param amount Amount of tokens to withdraw
-    function emergencyWithdrawERC20(address tokenAddress, address recipient, uint256 amount) external onlyRole(ADMIN_ROLE) {
-        IERC20 token = IERC20(tokenAddress);
-        require(token.balanceOf(address(this)) >= amount, "Insufficient token balance");
-        token.safeTransfer(recipient, amount);
+    /// @notice Remove a token from the rewards whitelist (prevents new supplies, existing schedules continue)
+    /// @param token The token address to remove
+    function removeRewardToken(address token) external onlyRole(ADMIN_ROLE) {
+        if (!whitelistedRewardTokens[token]) {
+            revert TokenNotWhitelisted(token);
+        }
+        
+        whitelistedRewardTokens[token] = false;
+        
+        // Remove from array (find and swap with last element)
+        for (uint256 i = 0; i < rewardTokensList.length; i++) {
+            if (rewardTokensList[i] == token) {
+                rewardTokensList[i] = rewardTokensList[rewardTokensList.length - 1];
+                rewardTokensList.pop();
+                break;
+            }
+        }
+        
+        emit RewardTokenRemoved(token);
     }
 
-    /// @notice Emergency withdraw ERC721 NFTs from contract
-    /// @param tokenAddress The ERC721 token address
-    /// @param recipient Address to receive the NFT
-    /// @param tokenId The NFT token ID
-    function emergencyWithdrawERC721(address tokenAddress, address recipient, uint256 tokenId) external onlyRole(ADMIN_ROLE) {
-        IERC721 token = IERC721(tokenAddress);
-        require(token.ownerOf(tokenId) == address(this), "Not owner of token");
-        token.transferFrom(address(this), recipient, tokenId);
-    }
-
-    /// @notice Set the fee percentage for reward claims
-    /// @param _fee Fee in basis points (e.g., 5 = 0.5%)
-    function setClaimFee(uint256 _fee) external onlyRole(ADMIN_ROLE) {
-        require(_fee <= 100, "Fee cannot exceed 10%"); // Max 10%
-        claimFee = _fee;
-        emit ClaimFeeSet(_fee);
+    /// @notice Supply rewards for a specific token over a duration
+    /// @param token The reward token address
+    /// @param amount Total amount of reward tokens to distribute
+    /// @param duration Duration in seconds over which to distribute rewards
+    function supplyRewards(address token, uint256 amount, uint256 duration) external onlyRole(ADMIN_ROLE) updateRewardForToken(token, address(0)) {
+        if (!whitelistedRewardTokens[token]) {
+            revert TokenNotWhitelisted(token);
+        }
+        require(amount > 0, "Cannot supply 0 rewards");
+        require(duration > 0, "Duration must be greater than 0");
+        
+        // Transfer tokens from caller to vault
+        IERC20(token).safeTransferFrom(msg.sender, address(vault), amount);
+        
+        // Create new reward schedule
+        rewardSchedules[token].push(RewardSchedule({
+            rewardRate: amount / duration,
+            startTime: block.timestamp,
+            endTime: block.timestamp + duration,
+            totalSupplied: amount,
+            pausedAt: 0,
+            totalPausedTime: 0
+        }));
+        
+        emit RewardAdded(token, amount, duration, amount / duration);
     }
 
     /// @notice Set the minimum lock duration
@@ -385,29 +520,24 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         emit MinimumLockDurationSet(_minimumLockDuration);
     }
 
-    /// @notice Make rewards available for claiming immediately
-    function releaseRewards() external onlyRole(ADMIN_ROLE) {
-        rewardsAvailableDate = block.timestamp;
-        emit RewardsMadeAvailable(block.timestamp);
+    /// @notice Set the ETH claim fee
+    /// @param _claimFeeETH The new claim fee in wei
+    function setClaimFeeETH(uint256 _claimFeeETH) external onlyRole(ADMIN_ROLE) {
+        claimFeeETH = _claimFeeETH;
+        emit ClaimFeeETHSet(_claimFeeETH);
     }
 
-    /// @notice Set the reward rate (rewards distributed per second)
-    /// @param _rewardRate The new reward rate in wei per second
-    function setRewardRate(uint256 _rewardRate) external onlyRole(ADMIN_ROLE) updateReward(address(0)) {
-        rewardRate = _rewardRate;
-        emit RewardRateSet(_rewardRate);
+    /// @notice Set the fee receiver address
+    /// @param _feeReceiver The new fee receiver address
+    function setFeeReceiver(address _feeReceiver) external onlyRole(ADMIN_ROLE) {
+        require(_feeReceiver != address(0), "Invalid address");
+        feeReceiver = _feeReceiver;
+        emit FeeReceiverSet(_feeReceiver);
     }
 
-    /// @notice Add reward tokens to the contract (callable by anyone)
-    /// @param amount Amount of reward tokens to add
-    function supplyRewards(uint256 amount) external updateReward(address(0)) {
-        rewardsToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit RewardAdded(amount);
-    }
-
-    /// @notice Add an address to the blacklist and return their staked tokens (forfeit rewards)
+    /// @notice Add an address to the blacklist and return their staked tokens (forfeit all rewards)
     /// @param account Address to blacklist
-    function blacklistWallet(address account) external onlyRole(ADMIN_ROLE) updateReward(account) {
+    function blacklistWallet(address account) external onlyRole(ADMIN_ROLE) updateRewardForAllTokens(account) {
         blacklist[account] = true;
         
         // Return all staked tokens to user (both locked and unlocked)
@@ -424,8 +554,10 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
             // Reset user's stake
             userStaked[account] = 0;
             
-            // Forfeit all rewards
-            rewards[account] = 0;
+            // Forfeit all rewards for all tokens
+            for (uint256 i = 0; i < rewardTokensList.length; i++) {
+                rewardsPerToken[account][rewardTokensList[i]] = 0;
+            }
             
             // Burn staking receipt tokens
             _burn(account, totalStaked);
@@ -446,6 +578,32 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
         emit BlacklistRemoved(account);
     }
 
+    /// @notice Emergency withdraw staking tokens from contract
+    /// @param recipient Address to receive the tokens
+    /// @param amount Amount of tokens to withdraw
+    function emergencyWithdrawStakes(address recipient, uint256 amount) external onlyRole(ADMIN_ROLE) {
+        stakingToken.safeTransfer(recipient, amount);
+        emit EmergencyWithdrawStakes(recipient, amount);
+    }
+
+    /// @notice Emergency withdraw ETH from contract
+    /// @param recipient Address to receive the ETH
+    /// @param amount Amount of ETH to withdraw
+    function emergencyWithdrawETH(address payable recipient, uint256 amount) external onlyRole(ADMIN_ROLE) {
+        require(address(this).balance >= amount, "Insufficient ETH balance");
+        recipient.transfer(amount);
+    }
+
+    /// @notice Emergency withdraw ERC721 NFTs from contract
+    /// @param tokenAddress The ERC721 token address
+    /// @param recipient Address to receive the NFT
+    /// @param tokenId The NFT token ID
+    function emergencyWithdrawERC721(address tokenAddress, address recipient, uint256 tokenId) external onlyRole(ADMIN_ROLE) {
+        IERC721 token = IERC721(tokenAddress);
+        require(token.ownerOf(tokenId) == address(this), "Not owner of token");
+        token.transferFrom(address(this), recipient, tokenId);
+    }
+
     /// @notice Pause all contract operations
     function pause() external onlyRole(PAUSER_ROLE) {
         _pause();
@@ -458,8 +616,80 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /* ========== INTERNAL FUNCTIONS ========== */
 
+    /// @notice Internal function to update rewards for a specific token and account
+    function _updateRewardForToken(address token, address account) internal {
+        // Handle pause/resume logic when totalSupply changes
+        _handleSupplyChange();
+        
+        // Update reward per token stored
+        if (totalSupply() > 0) {
+            uint256 activeRate = getActiveRewardRate(token);
+            uint256 timeDelta = block.timestamp - lastUpdateTimePerToken[token];
+            rewardPerTokenStoredPerToken[token] += (timeDelta * activeRate);
+        }
+        
+        lastUpdateTimePerToken[token] = block.timestamp;
+        
+        // Update user rewards
+        if (account != address(0)) {
+            rewardsPerToken[account][token] = earned(account, token);
+            userRewardPerTokenPaidPerToken[account][token] = rewardPerTokenStoredPerToken[token];
+        }
+    }
+
+    /// @notice Handle pause/resume of reward schedules when totalSupply changes
+    function _handleSupplyChange() internal {
+        bool isZeroNow = (totalSupply() == 0);
+        
+        if (isZeroNow && !wasTotalSupplyZero) {
+            // Just hit zero - pause all schedules
+            lastTotalSupplyZeroTime = block.timestamp;
+            wasTotalSupplyZero = true;
+            
+            // Mark all active schedules as paused
+            for (uint256 i = 0; i < rewardTokensList.length; i++) {
+                address token = rewardTokensList[i];
+                RewardSchedule[] storage schedules = rewardSchedules[token];
+                
+                for (uint256 j = 0; j < schedules.length; j++) {
+                    if (schedules[j].pausedAt == 0 && 
+                        block.timestamp >= schedules[j].startTime && 
+                        block.timestamp < schedules[j].endTime) {
+                        schedules[j].pausedAt = block.timestamp;
+                    }
+                }
+            }
+        } else if (!isZeroNow && wasTotalSupplyZero) {
+            // Just resumed from zero - unpause all schedules
+            uint256 pauseDuration = block.timestamp - lastTotalSupplyZeroTime;
+            wasTotalSupplyZero = false;
+            
+            // Add pause duration to all schedules that were paused
+            for (uint256 i = 0; i < rewardTokensList.length; i++) {
+                address token = rewardTokensList[i];
+                RewardSchedule[] storage schedules = rewardSchedules[token];
+                
+                for (uint256 j = 0; j < schedules.length; j++) {
+                    if (schedules[j].pausedAt > 0) {
+                        schedules[j].totalPausedTime += pauseDuration;
+                        schedules[j].pausedAt = 0;
+                    }
+                }
+            }
+        }
+    }
+
     /// @notice Override ERC20 _update to update rewards on token transfers
-    function _update(address from, address to, uint256 value) internal override(ERC20Pausable) updateReward(from) updateReward(to) {
+    function _update(address from, address to, uint256 value) internal override(ERC20Pausable) {
+        // Update rewards for both sender and receiver for all tokens
+        for (uint256 i = 0; i < rewardTokensList.length; i++) {
+            address token = rewardTokensList[i];
+            if (whitelistedRewardTokens[token]) {
+                _updateRewardForToken(token, from);
+                _updateRewardForToken(token, to);
+            }
+        }
+        
         super._update(from, to, value);
     }
 
@@ -470,13 +700,19 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /* ========== MODIFIERS ========== */
 
-    /// @notice Updates reward calculations for an account
-    modifier updateReward(address account) {
-        rewardPerTokenStored = rewardPerToken();
-        lastUpdateTime = block.timestamp;
-        if (account != address(0)) {
-            rewards[account] = earned(account);
-            userRewardPerTokenPaid[account] = rewardPerTokenStored;
+    /// @notice Updates reward calculations for a specific token and account
+    modifier updateRewardForToken(address token, address account) {
+        _updateRewardForToken(token, account);
+        _;
+    }
+
+    /// @notice Updates reward calculations for all whitelisted tokens for an account
+    modifier updateRewardForAllTokens(address account) {
+        for (uint256 i = 0; i < rewardTokensList.length; i++) {
+            address token = rewardTokensList[i];
+            if (whitelistedRewardTokens[token]) {
+                _updateRewardForToken(token, account);
+            }
         }
         _;
     }
@@ -491,15 +727,17 @@ contract FixedStakingRewards is IStakingRewards, ERC20Pausable, ReentrancyGuard,
 
     /* ========== EVENTS ========== */
 
-    event RewardAdded(uint256 reward);
+    event RewardTokenAdded(address indexed token);
+    event RewardTokenRemoved(address indexed token);
+    event RewardAdded(address indexed token, uint256 amount, uint256 duration, uint256 rewardRate);
     event Staked(address indexed user, uint256 amount, uint256 lock);
     event Withdrawn(address indexed user, uint256 amount);
-    event RewardPaid(address indexed user, uint256 reward);
-    event RewardsMadeAvailable(uint256 timestampAvailable);
-    event RewardRateSet(uint256 rewardRate);
+    event RewardPaid(address indexed user, address indexed token, uint256 reward);
     event BlacklistAdded(address indexed account);
     event BlacklistRemoved(address indexed account);
     event StakeReturnedDueToBlacklist(address indexed account, uint256 amount);
-    event ClaimFeeSet(uint256 fee);
     event MinimumLockDurationSet(uint256 duration);
+    event ClaimFeeETHSet(uint256 fee);
+    event FeeReceiverSet(address indexed feeReceiver);
+    event EmergencyWithdrawStakes(address indexed recipient, uint256 amount);
 }
