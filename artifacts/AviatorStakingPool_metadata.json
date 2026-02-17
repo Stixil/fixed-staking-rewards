@@ -64,24 +64,8 @@
 				"type": "error"
 			},
 			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "spender",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "allowance",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "needed",
-						"type": "uint256"
-					}
-				],
-				"name": "ERC20InsufficientAllowance",
+				"inputs": [],
+				"name": "ERC721EnumerableForbiddenBatchMint",
 				"type": "error"
 			},
 			{
@@ -93,16 +77,32 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "balance",
+						"name": "tokenId",
 						"type": "uint256"
 					},
 					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					}
+				],
+				"name": "ERC721IncorrectOwner",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "operator",
+						"type": "address"
+					},
+					{
 						"internalType": "uint256",
-						"name": "needed",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
-				"name": "ERC20InsufficientBalance",
+				"name": "ERC721InsufficientApproval",
 				"type": "error"
 			},
 			{
@@ -113,7 +113,29 @@
 						"type": "address"
 					}
 				],
-				"name": "ERC20InvalidApprover",
+				"name": "ERC721InvalidApprover",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "operator",
+						"type": "address"
+					}
+				],
+				"name": "ERC721InvalidOperator",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					}
+				],
+				"name": "ERC721InvalidOwner",
 				"type": "error"
 			},
 			{
@@ -124,7 +146,7 @@
 						"type": "address"
 					}
 				],
-				"name": "ERC20InvalidReceiver",
+				"name": "ERC721InvalidReceiver",
 				"type": "error"
 			},
 			{
@@ -135,18 +157,34 @@
 						"type": "address"
 					}
 				],
-				"name": "ERC20InvalidSender",
+				"name": "ERC721InvalidSender",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "ERC721NonexistentToken",
 				"type": "error"
 			},
 			{
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "spender",
+						"name": "owner",
 						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "index",
+						"type": "uint256"
 					}
 				],
-				"name": "ERC20InvalidSpender",
+				"name": "ERC721OutOfBoundsIndex",
 				"type": "error"
 			},
 			{
@@ -157,33 +195,6 @@
 			{
 				"inputs": [],
 				"name": "ExpectedPause",
-				"type": "error"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "requested",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "available",
-						"type": "uint256"
-					}
-				],
-				"name": "InsufficientUnlockedBalance",
-				"type": "error"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "uint256",
-						"name": "stakeId",
-						"type": "uint256"
-					}
-				],
-				"name": "InvalidStakeId",
 				"type": "error"
 			},
 			{
@@ -205,6 +216,22 @@
 			{
 				"inputs": [
 					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					},
+					{
+						"internalType": "string",
+						"name": "reason",
+						"type": "string"
+					}
+				],
+				"name": "IsFrozen",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "uint256",
 						"name": "provided",
 						"type": "uint256"
@@ -216,6 +243,17 @@
 					}
 				],
 				"name": "LockDurationTooShort",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "NotStakeOwner",
 				"type": "error"
 			},
 			{
@@ -232,6 +270,17 @@
 					}
 				],
 				"name": "SafeERC20FailedOperation",
+				"type": "error"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "StakeAlreadyWithdrawn",
 				"type": "error"
 			},
 			{
@@ -268,17 +317,42 @@
 					{
 						"indexed": true,
 						"internalType": "address",
-						"name": "spender",
+						"name": "approved",
 						"type": "address"
 					},
 					{
-						"indexed": false,
+						"indexed": true,
 						"internalType": "uint256",
-						"name": "value",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
 				"name": "Approval",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "operator",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "bool",
+						"name": "approved",
+						"type": "bool"
+					}
+				],
+				"name": "ApprovalForAll",
 				"type": "event"
 			},
 			{
@@ -632,6 +706,12 @@
 						"type": "address"
 					},
 					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					},
+					{
 						"indexed": false,
 						"internalType": "uint256",
 						"name": "amount",
@@ -663,9 +743,9 @@
 						"type": "address"
 					},
 					{
-						"indexed": false,
+						"indexed": true,
 						"internalType": "uint256",
-						"name": "value",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
@@ -691,8 +771,52 @@
 					{
 						"indexed": true,
 						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "WalletFrozen",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					},
+					{
+						"indexed": false,
+						"internalType": "uint256",
+						"name": "timestamp",
+						"type": "uint256"
+					}
+				],
+				"name": "WalletUnfrozen",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": true,
+						"internalType": "address",
 						"name": "user",
 						"type": "address"
+					},
+					{
+						"indexed": true,
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
 					},
 					{
 						"indexed": false,
@@ -720,6 +844,19 @@
 			{
 				"inputs": [],
 				"name": "DEFAULT_ADMIN_ROLE",
+				"outputs": [
+					{
+						"internalType": "bytes32",
+						"name": "",
+						"type": "bytes32"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "FREEZER_ROLE",
 				"outputs": [
 					{
 						"internalType": "bytes32",
@@ -760,16 +897,29 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "owner",
+						"name": "to",
 						"type": "address"
 					},
 					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "approve",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "address",
-						"name": "spender",
+						"name": "owner",
 						"type": "address"
 					}
 				],
-				"name": "allowance",
+				"name": "balanceOf",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -784,35 +934,11 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "spender",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "value",
-						"type": "uint256"
-					}
-				],
-				"name": "approve",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
 						"name": "account",
 						"type": "address"
 					}
 				],
-				"name": "balanceOf",
+				"name": "balanceOfStaked",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -863,19 +989,6 @@
 						"internalType": "uint256",
 						"name": "",
 						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "decimals",
-				"outputs": [
-					{
-						"internalType": "uint8",
-						"name": "",
-						"type": "uint8"
 					}
 				],
 				"stateMutability": "view",
@@ -1014,19 +1127,44 @@
 			},
 			{
 				"inputs": [],
-				"name": "exit",
-				"outputs": [],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [],
 				"name": "feeReceiver",
 				"outputs": [
 					{
 						"internalType": "address",
 						"name": "",
 						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "freezeWallet",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"name": "frozen",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
 					}
 				],
 				"stateMutability": "view",
@@ -1061,6 +1199,25 @@
 			{
 				"inputs": [
 					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "getApproved",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "address",
 						"name": "account",
 						"type": "address"
@@ -1075,13 +1232,6 @@
 					}
 				],
 				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [],
-				"name": "getReward",
-				"outputs": [],
-				"stateMutability": "nonpayable",
 				"type": "function"
 			},
 			{
@@ -1245,13 +1395,8 @@
 			{
 				"inputs": [
 					{
-						"internalType": "address",
-						"name": "account",
-						"type": "address"
-					},
-					{
 						"internalType": "uint256",
-						"name": "stakeId",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
@@ -1270,12 +1415,17 @@
 								"type": "uint256"
 							},
 							{
+								"internalType": "uint256",
+								"name": "stakeTime",
+								"type": "uint256"
+							},
+							{
 								"internalType": "bool",
 								"name": "withdrawn",
 								"type": "bool"
 							}
 						],
-						"internalType": "struct AviatorStakingPool.StakePosition",
+						"internalType": "struct AviatorStakingPool.StakeNFT",
 						"name": "",
 						"type": "tuple"
 					}
@@ -1310,12 +1460,12 @@
 						"type": "address"
 					}
 				],
-				"name": "getUserStakePositionCount",
+				"name": "getUserStakeIds",
 				"outputs": [
 					{
-						"internalType": "uint256",
+						"internalType": "uint256[]",
 						"name": "",
-						"type": "uint256"
+						"type": "uint256[]"
 					}
 				],
 				"stateMutability": "view",
@@ -1344,12 +1494,17 @@
 								"type": "uint256"
 							},
 							{
+								"internalType": "uint256",
+								"name": "stakeTime",
+								"type": "uint256"
+							},
+							{
 								"internalType": "bool",
 								"name": "withdrawn",
 								"type": "bool"
 							}
 						],
-						"internalType": "struct AviatorStakingPool.StakePosition[]",
+						"internalType": "struct AviatorStakingPool.StakeNFT[]",
 						"name": "",
 						"type": "tuple[]"
 					}
@@ -1416,6 +1571,30 @@
 				"inputs": [
 					{
 						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "operator",
+						"type": "address"
+					}
+				],
+				"name": "isApprovedForAll",
+				"outputs": [
+					{
+						"internalType": "bool",
+						"name": "",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
 						"name": "account",
 						"type": "address"
 					}
@@ -1435,16 +1614,16 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "",
+						"name": "account",
 						"type": "address"
 					}
 				],
-				"name": "lastStakeTime",
+				"name": "isFrozen",
 				"outputs": [
 					{
-						"internalType": "uint256",
+						"internalType": "bool",
 						"name": "",
-						"type": "uint256"
+						"type": "bool"
 					}
 				],
 				"stateMutability": "view",
@@ -1503,6 +1682,38 @@
 						"internalType": "string",
 						"name": "",
 						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "nextTokenId",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "ownerOf",
+				"outputs": [
+					{
+						"internalType": "address",
+						"name": "",
+						"type": "address"
 					}
 				],
 				"stateMutability": "view",
@@ -1710,6 +1921,75 @@
 			{
 				"inputs": [
 					{
+						"internalType": "address",
+						"name": "from",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "safeTransferFrom",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "from",
+						"type": "address"
+					},
+					{
+						"internalType": "address",
+						"name": "to",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bytes",
+						"name": "data",
+						"type": "bytes"
+					}
+				],
+				"name": "safeTransferFrom",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "operator",
+						"type": "address"
+					},
+					{
+						"internalType": "bool",
+						"name": "approved",
+						"type": "bool"
+					}
+				],
+				"name": "setApprovalForAll",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
 						"internalType": "uint256",
 						"name": "_claimFeeETH",
 						"type": "uint256"
@@ -1754,8 +2034,14 @@
 						"type": "uint256"
 					}
 				],
-				"name": "stake",
-				"outputs": [],
+				"name": "stakeTokens",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
 				"stateMutability": "nonpayable",
 				"type": "function"
 			},
@@ -1773,8 +2059,48 @@
 					}
 				],
 				"name": "stakeWithBonus",
-				"outputs": [],
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
 				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"name": "stakes",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "amount",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "unlockTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "uint256",
+						"name": "stakeTime",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "withdrawn",
+						"type": "bool"
+					}
+				],
+				"stateMutability": "view",
 				"type": "function"
 			},
 			{
@@ -1846,6 +2172,81 @@
 				"type": "function"
 			},
 			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "index",
+						"type": "uint256"
+					}
+				],
+				"name": "tokenByIndex",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "owner",
+						"type": "address"
+					},
+					{
+						"internalType": "uint256",
+						"name": "index",
+						"type": "uint256"
+					}
+				],
+				"name": "tokenOfOwnerByIndex",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "uint256",
+						"name": "tokenId",
+						"type": "uint256"
+					}
+				],
+				"name": "tokenURI",
+				"outputs": [
+					{
+						"internalType": "string",
+						"name": "",
+						"type": "string"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
+				"inputs": [],
+				"name": "totalStakedAmount",
+				"outputs": [
+					{
+						"internalType": "uint256",
+						"name": "",
+						"type": "uint256"
+					}
+				],
+				"stateMutability": "view",
+				"type": "function"
+			},
+			{
 				"inputs": [],
 				"name": "totalSupply",
 				"outputs": [
@@ -1862,30 +2263,6 @@
 				"inputs": [
 					{
 						"internalType": "address",
-						"name": "to",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "value",
-						"type": "uint256"
-					}
-				],
-				"name": "transfer",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "nonpayable",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
 						"name": "from",
 						"type": "address"
 					},
@@ -1896,18 +2273,12 @@
 					},
 					{
 						"internalType": "uint256",
-						"name": "value",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
 				"name": "transferFrom",
-				"outputs": [
-					{
-						"internalType": "bool",
-						"name": "",
-						"type": "bool"
-					}
-				],
+				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
 			},
@@ -1920,6 +2291,19 @@
 					}
 				],
 				"name": "unblacklistWallet",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
+						"name": "account",
+						"type": "address"
+					}
+				],
+				"name": "unfreezeWallet",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -1945,78 +2329,6 @@
 					}
 				],
 				"name": "userRewardPerTokenPaidPerToken",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"name": "userStakeCount",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					},
-					{
-						"internalType": "uint256",
-						"name": "",
-						"type": "uint256"
-					}
-				],
-				"name": "userStakePositions",
-				"outputs": [
-					{
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					},
-					{
-						"internalType": "uint256",
-						"name": "unlockTime",
-						"type": "uint256"
-					},
-					{
-						"internalType": "bool",
-						"name": "withdrawn",
-						"type": "bool"
-					}
-				],
-				"stateMutability": "view",
-				"type": "function"
-			},
-			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "",
-						"type": "address"
-					}
-				],
-				"name": "userStaked",
 				"outputs": [
 					{
 						"internalType": "uint256",
@@ -2076,7 +2388,7 @@
 				"inputs": [
 					{
 						"internalType": "uint256",
-						"name": "amount",
+						"name": "tokenId",
 						"type": "uint256"
 					}
 				],
@@ -2086,14 +2398,21 @@
 				"type": "function"
 			},
 			{
+				"inputs": [],
+				"name": "withdrawAllUnlocked",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
 				"inputs": [
 					{
-						"internalType": "uint256",
-						"name": "stakeId",
-						"type": "uint256"
+						"internalType": "uint256[]",
+						"name": "tokenIds",
+						"type": "uint256[]"
 					}
 				],
-				"name": "withdrawStakePosition",
+				"name": "withdrawMultiple",
 				"outputs": [],
 				"stateMutability": "nonpayable",
 				"type": "function"
@@ -2111,27 +2430,31 @@
 						"details": "The `account` is missing a role."
 					}
 				],
-				"ERC20InsufficientAllowance(address,uint256,uint256)": [
+				"ERC721EnumerableForbiddenBatchMint()": [
 					{
-						"details": "Indicates a failure with the `spender`’s `allowance`. Used in transfers.",
+						"details": "Batch mint is not allowed."
+					}
+				],
+				"ERC721IncorrectOwner(address,uint256,address)": [
+					{
+						"details": "Indicates an error related to the ownership over a particular token. Used in transfers.",
 						"params": {
-							"allowance": "Amount of tokens a `spender` is allowed to operate with.",
-							"needed": "Minimum amount required to perform a transfer.",
-							"spender": "Address that may be allowed to operate on tokens without being their owner."
+							"owner": "Address of the current owner of a token.",
+							"sender": "Address whose tokens are being transferred.",
+							"tokenId": "Identifier number of a token."
 						}
 					}
 				],
-				"ERC20InsufficientBalance(address,uint256,uint256)": [
+				"ERC721InsufficientApproval(address,uint256)": [
 					{
-						"details": "Indicates an error related to the current `balance` of a `sender`. Used in transfers.",
+						"details": "Indicates a failure with the `operator`’s approval. Used in transfers.",
 						"params": {
-							"balance": "Current balance for the interacting account.",
-							"needed": "Minimum amount required to perform a transfer.",
-							"sender": "Address whose tokens are being transferred."
+							"operator": "Address that may be allowed to operate on tokens without being their owner.",
+							"tokenId": "Identifier number of a token."
 						}
 					}
 				],
-				"ERC20InvalidApprover(address)": [
+				"ERC721InvalidApprover(address)": [
 					{
 						"details": "Indicates a failure with the `approver` of a token to be approved. Used in approvals.",
 						"params": {
@@ -2139,7 +2462,23 @@
 						}
 					}
 				],
-				"ERC20InvalidReceiver(address)": [
+				"ERC721InvalidOperator(address)": [
+					{
+						"details": "Indicates a failure with the `operator` to be approved. Used in approvals.",
+						"params": {
+							"operator": "Address that may be allowed to operate on tokens without being their owner."
+						}
+					}
+				],
+				"ERC721InvalidOwner(address)": [
+					{
+						"details": "Indicates that an address can't be an owner. For example, `address(0)` is a forbidden owner in ERC-20. Used in balance queries.",
+						"params": {
+							"owner": "Address of the current owner of a token."
+						}
+					}
+				],
+				"ERC721InvalidReceiver(address)": [
 					{
 						"details": "Indicates a failure with the token `receiver`. Used in transfers.",
 						"params": {
@@ -2147,7 +2486,7 @@
 						}
 					}
 				],
-				"ERC20InvalidSender(address)": [
+				"ERC721InvalidSender(address)": [
 					{
 						"details": "Indicates a failure with the token `sender`. Used in transfers.",
 						"params": {
@@ -2155,12 +2494,17 @@
 						}
 					}
 				],
-				"ERC20InvalidSpender(address)": [
+				"ERC721NonexistentToken(uint256)": [
 					{
-						"details": "Indicates a failure with the `spender` to be approved. Used in approvals.",
+						"details": "Indicates a `tokenId` whose `owner` is the zero address.",
 						"params": {
-							"spender": "Address that may be allowed to operate on tokens without being their owner."
+							"tokenId": "Identifier number of a token."
 						}
+					}
+				],
+				"ERC721OutOfBoundsIndex(address,uint256)": [
+					{
+						"details": "An `owner`'s token query was out of bounds for `index`. NOTE: The owner being `address(0)` indicates a global out of bounds index."
 					}
 				],
 				"EnforcedPause()": [
@@ -2186,7 +2530,10 @@
 			},
 			"events": {
 				"Approval(address,address,uint256)": {
-					"details": "Emitted when the allowance of a `spender` for an `owner` is set by a call to {approve}. `value` is the new allowance."
+					"details": "Emitted when `owner` enables `approved` to manage the `tokenId` token."
+				},
+				"ApprovalForAll(address,address,bool)": {
+					"details": "Emitted when `owner` enables or disables (`approved`) `operator` to manage all of its assets."
 				},
 				"Paused(address)": {
 					"details": "Emitted when the pause is triggered by `account`."
@@ -2201,7 +2548,7 @@
 					"details": "Emitted when `account` is revoked `role`. `sender` is the account that originated the contract call:   - if using `revokeRole`, it is the admin role bearer   - if using `renounceRole`, it is the role bearer (i.e. `account`)"
 				},
 				"Transfer(address,address,uint256)": {
-					"details": "Emitted when `value` tokens are moved from one account (`from`) to another (`to`). Note that `value` may be zero."
+					"details": "Emitted when `tokenId` token is transferred from `from` to `to`."
 				},
 				"Unpaused(address)": {
 					"details": "Emitted when the pause is lifted by `account`."
@@ -2214,14 +2561,19 @@
 						"token": "The token address to whitelist"
 					}
 				},
-				"allowance(address,address)": {
-					"details": "Returns the remaining number of tokens that `spender` will be allowed to spend on behalf of `owner` through {transferFrom}. This is zero by default. This value changes when {approve} or {transferFrom} are called."
-				},
 				"approve(address,uint256)": {
-					"details": "See {IERC20-approve}. NOTE: If `value` is the maximum `uint256`, the allowance is not updated on `transferFrom`. This is semantically equivalent to an infinite approval. Requirements: - `spender` cannot be the zero address."
+					"details": "Gives permission to `to` to transfer `tokenId` token to another account. The approval is cleared when the token is transferred. Only a single account can be approved at a time, so approving the zero address clears previous approvals. Requirements: - The caller must own the token or be an approved operator. - `tokenId` must exist. Emits an {Approval} event."
 				},
 				"balanceOf(address)": {
-					"details": "Returns the value of tokens owned by `account`."
+					"details": "Returns the number of tokens in ``owner``'s account."
+				},
+				"balanceOfStaked(address)": {
+					"params": {
+						"account": "The address to check"
+					},
+					"returns": {
+						"_0": "Total amount staked"
+					}
 				},
 				"blacklistWallet(address)": {
 					"params": {
@@ -2234,9 +2586,6 @@
 						"_stakingToken": "The token users will stake",
 						"_vault": "The rewards vault address"
 					}
-				},
-				"decimals()": {
-					"details": "Returns the number of decimals used to get its user representation. For example, if `decimals` equals `2`, a balance of `505` tokens should be displayed to a user as `5.05` (`505 / 10 ** 2`). Tokens usually opt for a value of 18, imitating the relationship between Ether and Wei. This is the default value returned by this function, unless it's overridden. NOTE: This information is only used for _display_ purposes: it in no way affects any of the arithmetic of the contract, including {IERC20-balanceOf} and {IERC20-transfer}."
 				},
 				"earned(address)": {
 					"params": {
@@ -2267,7 +2616,8 @@
 				"emergencyWithdrawERC20(address,address,uint256)": {
 					"params": {
 						"amount": "Amount of tokens to withdraw",
-						"recipient": "Address to receive the tokens"
+						"recipient": "Address to receive the tokens",
+						"tokenAddress": "The ERC20 token address"
 					}
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
@@ -2283,6 +2633,11 @@
 						"recipient": "Address to receive the ETH"
 					}
 				},
+				"freezeWallet(address)": {
+					"params": {
+						"account": "Address to freeze"
+					}
+				},
 				"getActiveRewardRate(address)": {
 					"params": {
 						"token": "The reward token address"
@@ -2290,6 +2645,9 @@
 					"returns": {
 						"_0": "Total active reward rate"
 					}
+				},
+				"getApproved(uint256)": {
+					"details": "Returns the account approved for `tokenId` token. Requirements: - `tokenId` must exist."
 				},
 				"getLockedBalance(address)": {
 					"params": {
@@ -2329,10 +2687,9 @@
 				"getRoleMembers(bytes32)": {
 					"details": "Return all accounts that have `role` WARNING: This operation will copy the entire storage to memory, which can be quite expensive. This is designed to mostly be used by view accessors that are queried without any gas fees. Developers should keep in mind that this function has an unbounded cost, and using it as part of a state-changing function may render the function uncallable if the set grows to a point where copying to memory consumes too much gas to fit in a block."
 				},
-				"getStakePosition(address,uint256)": {
+				"getStakePosition(uint256)": {
 					"params": {
-						"account": "The address to check",
-						"stakeId": "The index of the stake position"
+						"tokenId": "The NFT token ID"
 					},
 					"returns": {
 						"_0": "The stake position"
@@ -2346,12 +2703,12 @@
 						"_0": "The amount of tokens that are unlocked and can be withdrawn"
 					}
 				},
-				"getUserStakePositionCount(address)": {
+				"getUserStakeIds(address)": {
 					"params": {
 						"account": "The address to check"
 					},
 					"returns": {
-						"_0": "The number of stake positions"
+						"_0": "Array of token IDs"
 					}
 				},
 				"getUserStakePositions(address)": {
@@ -2359,7 +2716,7 @@
 						"account": "The address to check"
 					},
 					"returns": {
-						"_0": "Array of stake positions"
+						"_0": "Array of stake NFT data"
 					}
 				},
 				"getWhitelistedRewardTokens()": {
@@ -2373,6 +2730,9 @@
 				"hasRole(bytes32,address)": {
 					"details": "Returns `true` if `account` has been granted `role`."
 				},
+				"isApprovedForAll(address,address)": {
+					"details": "Returns if the `operator` is allowed to manage all of the assets of `owner`. See {setApprovalForAll}"
+				},
 				"isBlacklisted(address)": {
 					"params": {
 						"account": "The address to check"
@@ -2381,8 +2741,19 @@
 						"_0": "True if blacklisted, false otherwise"
 					}
 				},
+				"isFrozen(address)": {
+					"params": {
+						"account": "The address to check"
+					},
+					"returns": {
+						"_0": "True if frozen, false otherwise"
+					}
+				},
 				"name()": {
-					"details": "Returns the name of the token."
+					"details": "Returns the token collection name."
+				},
+				"ownerOf(uint256)": {
+					"details": "Returns the owner of the `tokenId` token. Requirements: - `tokenId` must exist."
 				},
 				"paused()": {
 					"details": "Returns true if the contract is paused, and false otherwise."
@@ -2406,6 +2777,15 @@
 						"_0": "The reward per token value"
 					}
 				},
+				"safeTransferFrom(address,address,uint256)": {
+					"details": "Safely transfers `tokenId` token from `from` to `to`, checking first that contract recipients are aware of the ERC-721 protocol to prevent tokens from being forever locked. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must have been allowed to move this token by either {approve} or   {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon   a safe transfer. Emits a {Transfer} event."
+				},
+				"safeTransferFrom(address,address,uint256,bytes)": {
+					"details": "Safely transfers `tokenId` token from `from` to `to`. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must exist and be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. - If `to` refers to a smart contract, it must implement {IERC721Receiver-onERC721Received}, which is called upon   a safe transfer. Emits a {Transfer} event."
+				},
+				"setApprovalForAll(address,bool)": {
+					"details": "Approve or remove `operator` as an operator for the caller. Operators can call {transferFrom} or {safeTransferFrom} for any token owned by the caller. Requirements: - The `operator` cannot be the address zero. Emits an {ApprovalForAll} event."
+				},
 				"setClaimFeeETH(uint256)": {
 					"params": {
 						"_claimFeeETH": "The new claim fee in wei"
@@ -2421,15 +2801,21 @@
 						"_minimumLockDuration": "The new minimum lock duration in seconds"
 					}
 				},
-				"stake(uint256)": {
+				"stakeTokens(uint256)": {
 					"params": {
 						"amount": "The amount of tokens to stake"
+					},
+					"returns": {
+						"_0": "tokenId The NFT token ID representing this stake"
 					}
 				},
 				"stakeWithBonus(uint256,uint256)": {
 					"params": {
 						"amount": "The amount of tokens to stake",
 						"lock": "The lock duration in seconds (must be at least minimumLockDuration)"
+					},
+					"returns": {
+						"_0": "tokenId The NFT token ID representing this stake"
 					}
 				},
 				"supplyRewards(address,uint256,uint256)": {
@@ -2440,30 +2826,41 @@
 					}
 				},
 				"symbol()": {
-					"details": "Returns the symbol of the token, usually a shorter version of the name."
+					"details": "Returns the token collection symbol."
+				},
+				"tokenByIndex(uint256)": {
+					"details": "Returns a token ID at a given `index` of all the tokens stored by the contract. Use along with {totalSupply} to enumerate all tokens."
+				},
+				"tokenOfOwnerByIndex(address,uint256)": {
+					"details": "Returns a token ID owned by `owner` at a given `index` of its token list. Use along with {balanceOf} to enumerate all of ``owner``'s tokens."
+				},
+				"tokenURI(uint256)": {
+					"details": "Returns the Uniform Resource Identifier (URI) for `tokenId` token."
 				},
 				"totalSupply()": {
-					"details": "Returns the value of tokens in existence."
-				},
-				"transfer(address,uint256)": {
-					"details": "See {IERC20-transfer}. Requirements: - `to` cannot be the zero address. - the caller must have a balance of at least `value`."
+					"details": "Returns the total amount of tokens stored by the contract."
 				},
 				"transferFrom(address,address,uint256)": {
-					"details": "See {IERC20-transferFrom}. Skips emitting an {Approval} event indicating an allowance update. This is not required by the ERC. See {xref-ERC20-_approve-address-address-uint256-bool-}[_approve]. NOTE: Does not update the allowance if the current allowance is the maximum `uint256`. Requirements: - `from` and `to` cannot be the zero address. - `from` must have a balance of at least `value`. - the caller must have allowance for ``from``'s tokens of at least `value`."
+					"details": "Transfers `tokenId` token from `from` to `to`. WARNING: Note that the caller is responsible to confirm that the recipient is capable of receiving ERC-721 or else they may be permanently lost. Usage of {safeTransferFrom} prevents loss, though the caller must understand this adds an external call which potentially creates a reentrancy vulnerability. Requirements: - `from` cannot be the zero address. - `to` cannot be the zero address. - `tokenId` token must be owned by `from`. - If the caller is not `from`, it must be approved to move this token by either {approve} or {setApprovalForAll}. Emits a {Transfer} event."
 				},
 				"unblacklistWallet(address)": {
 					"params": {
 						"account": "Address to remove from blacklist"
 					}
 				},
-				"withdraw(uint256)": {
+				"unfreezeWallet(address)": {
 					"params": {
-						"amount": "The amount of tokens to withdraw"
+						"account": "Address to unfreeze"
 					}
 				},
-				"withdrawStakePosition(uint256)": {
+				"withdraw(uint256)": {
 					"params": {
-						"stakeId": "The ID of the stake position to withdraw"
+						"tokenId": "The NFT token ID to withdraw"
+					}
+				},
+				"withdrawMultiple(uint256[])": {
+					"params": {
+						"tokenIds": "Array of NFT token IDs to withdraw"
 					}
 				}
 			},
@@ -2475,14 +2872,17 @@
 				"addRewardToken(address)": {
 					"notice": "Add a token to the rewards whitelist"
 				},
+				"balanceOfStaked(address)": {
+					"notice": "Get total staked amount for a user (sum of all their NFT stakes)"
+				},
 				"blacklistWallet(address)": {
-					"notice": "Add an address to the blacklist and return their staked tokens (forfeit all rewards)"
+					"notice": "Blacklist an address and return their stake (forfeit all rewards as penalty)"
 				},
 				"constructor": {
 					"notice": "Initializes the staking contract"
 				},
 				"earned(address)": {
-					"notice": "Returns the total rewards earned by an account (legacy interface compatibility)"
+					"notice": "Returns the total rewards earned by an account (first whitelisted token)"
 				},
 				"earned(address,address)": {
 					"notice": "Returns the total rewards earned by an account for a specific token"
@@ -2491,7 +2891,7 @@
 					"notice": "Get earned rewards for all whitelisted tokens"
 				},
 				"emergencyWithdrawERC20(address,address,uint256)": {
-					"notice": "Emergency withdraw ERC20 tokens from contract"
+					"notice": "Emergency withdraw ERC20 tokens from contract (use for court-ordered confiscations)"
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
 					"notice": "Emergency withdraw ERC721 NFTs from contract"
@@ -2499,8 +2899,8 @@
 				"emergencyWithdrawETH(address,uint256)": {
 					"notice": "Emergency withdraw ETH from contract"
 				},
-				"exit()": {
-					"notice": "Withdraw all unlocked staked tokens and claim all rewards"
+				"freezeWallet(address)": {
+					"notice": "Freeze a wallet for compliance purposes (rewards still accrue)"
 				},
 				"getActiveRewardRate(address)": {
 					"notice": "Get the active reward rate for a token (sum of all active schedules)"
@@ -2511,11 +2911,8 @@
 				"getLockedBalance(address)": {
 					"notice": "Get the locked balance for a user"
 				},
-				"getReward()": {
-					"notice": "Claim accumulated rewards (legacy interface - claims first whitelisted token)"
-				},
 				"getRewardForDuration()": {
-					"notice": "Gets the total reward amount for a 14-day period (legacy interface)"
+					"notice": "Gets the total reward amount for a 14-day period"
 				},
 				"getRewardForToken(address)": {
 					"notice": "Claim rewards for a specific token"
@@ -2523,23 +2920,26 @@
 				"getRewardSchedules(address)": {
 					"notice": "Get all reward schedules for a token"
 				},
-				"getStakePosition(address,uint256)": {
-					"notice": "Get a specific stake position"
+				"getStakePosition(uint256)": {
+					"notice": "Get a specific stake position by token ID"
 				},
 				"getUnlockedBalance(address)": {
 					"notice": "Get the unlocked balance for a user"
 				},
-				"getUserStakePositionCount(address)": {
-					"notice": "Get total number of stake positions for a user"
+				"getUserStakeIds(address)": {
+					"notice": "Get all stake NFT IDs for a user"
 				},
 				"getUserStakePositions(address)": {
-					"notice": "Get all stake positions for a user"
+					"notice": "Get all stake positions for a user with full details"
 				},
 				"getWhitelistedRewardTokens()": {
 					"notice": "Get all whitelisted reward tokens"
 				},
 				"isBlacklisted(address)": {
 					"notice": "Checks if an address is blacklisted"
+				},
+				"isFrozen(address)": {
+					"notice": "Checks if an address is frozen"
 				},
 				"pause()": {
 					"notice": "Pause all contract operations"
@@ -2559,8 +2959,8 @@
 				"setMinimumLockDuration(uint256)": {
 					"notice": "Set the minimum lock duration"
 				},
-				"stake(uint256)": {
-					"notice": "Stake tokens with default minimum lock period (interface compatibility)"
+				"stakeTokens(uint256)": {
+					"notice": "Stake tokens with default minimum lock period"
 				},
 				"stakeWithBonus(uint256,uint256)": {
 					"notice": "Stake tokens with a custom time lock (with bonus rewards)"
@@ -2569,19 +2969,25 @@
 					"notice": "Supply rewards for a specific token over a duration"
 				},
 				"supportsInterface(bytes4)": {
-					"notice": "Override supportsInterface for AccessControlEnumerable"
+					"notice": "Override supportsInterface for multiple inheritance"
 				},
 				"unblacklistWallet(address)": {
 					"notice": "Remove an address from the blacklist"
+				},
+				"unfreezeWallet(address)": {
+					"notice": "Unfreeze a wallet"
 				},
 				"unpause()": {
 					"notice": "Unpause contract operations"
 				},
 				"withdraw(uint256)": {
-					"notice": "Withdraw unlocked staked tokens"
+					"notice": "Withdraw a specific stake position by NFT token ID"
 				},
-				"withdrawStakePosition(uint256)": {
-					"notice": "Withdraw a specific stake position by ID"
+				"withdrawAllUnlocked()": {
+					"notice": "Withdraw all unlocked stake positions"
+				},
+				"withdrawMultiple(uint256[])": {
+					"notice": "Withdraw multiple stake positions at once"
 				}
 			},
 			"version": 1
@@ -2667,36 +3073,12 @@
 				"dweb:/ipfs/QmPsfxjVpMcZbpE7BH93DzTpEaktESigEw4SmDzkXuJ4WR"
 			]
 		},
-		"@openzeppelin/contracts/token/ERC20/ERC20.sol": {
-			"keccak256": "0x86b7b71a6aedefdad89b607378eeab1dcc5389b9ea7d17346d08af01d7190994",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://1dc2db8d94a21eac8efe03adf574c419b08536409b416057a2b5b95cb772c43c",
-				"dweb:/ipfs/QmZfqJCKVU1ScuX2A7s8WZdQEaikwJbDH5JBrBdKTUT4Gu"
-			]
-		},
 		"@openzeppelin/contracts/token/ERC20/IERC20.sol": {
 			"keccak256": "0x74ed01eb66b923d0d0cfe3be84604ac04b76482a55f9dd655e1ef4d367f95bc2",
 			"license": "MIT",
 			"urls": [
 				"bzz-raw://5282825a626cfe924e504274b864a652b0023591fa66f06a067b25b51ba9b303",
 				"dweb:/ipfs/QmeCfPykghhMc81VJTrHTC7sF6CRvaA1FXVq2pJhwYp1dV"
-			]
-		},
-		"@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol": {
-			"keccak256": "0x756aee61d83960d324973de3a64920a02b480efe662b611fb05ea506d844aa55",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://4dfb71ab2f5fcc530226a25bba4d808f4d22a7f383cae4a3be3629ec057b276c",
-				"dweb:/ipfs/QmRzyetUjbr9Gx1pcXYSsE5rz4XypfEbZgmBvZKUNUJQLR"
-			]
-		},
-		"@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol": {
-			"keccak256": "0xd6fa4088198f04eef10c5bce8a2f4d60554b7ec4b987f684393c01bf79b94d9f",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://f95ee0bbd4dd3ac730d066ba3e785ded4565e890dbec2fa7d3b9fe3bad9d0d6e",
-				"dweb:/ipfs/QmSLr6bHkPFWT7ntj34jmwfyskpwo97T9jZUrk5sz3sdtR"
 			]
 		},
 		"@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol": {
@@ -2707,12 +3089,60 @@
 				"dweb:/ipfs/QmbcBmFX66AY6Kbhnd5gx7zpkgqnUafo43XnmayAM7zVdB"
 			]
 		},
+		"@openzeppelin/contracts/token/ERC721/ERC721.sol": {
+			"keccak256": "0x6ead281d4569c26b3dee7313aefff24add906f3600b57d8aef1255a17d6b34e5",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://aec0f9c9f14f829353663e1946bf0ea00a1771ff6ddb4f7cbe14893397b4b55c",
+				"dweb:/ipfs/QmVMR3SdijdM2BpL9Yp3u7Riaxqgs1FnZ1Rfg2CMjKGtVS"
+			]
+		},
 		"@openzeppelin/contracts/token/ERC721/IERC721.sol": {
 			"keccak256": "0xf78f05f3b8c9f75570e85300d7b4600d7f6f6a198449273f31d44c1641adb46f",
 			"license": "MIT",
 			"urls": [
 				"bzz-raw://e28b872613b45e0e801d4995aa4380be2531147bfe2d85c1d6275f1de514fba3",
 				"dweb:/ipfs/QmeeFcfShHYaS3BdgVj78nxR28ZaVUwbvr66ud8bT6kzw9"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol": {
+			"keccak256": "0x88cd5e3bee2e8c36b8d9058fbcaa81ad5704281b25634122234b55ea853d8055",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://8dc7e7ab5b8ea36c15027ab04221b05d1c970f47a53e9fd47ead8ca665d49c7e",
+				"dweb:/ipfs/Qmeeph7fsDyfRr8vb2L8KcDEmKPb224TAayMvgqgGAnqpL"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol": {
+			"keccak256": "0xe85bdcbce4b8474872045aafb5ed8e3e0a5bd794ded35f76ee9deef25bdc7446",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://60872f2d516e70f06d9684386c6b9c0b9d7ff7f4af257be6087efa2c3bb81937",
+				"dweb:/ipfs/QmdWgPbs2e8SFNNXPFwTt2xD5N8hniehgGCMHUnY1JDcCw"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC721/extensions/IERC721Enumerable.sol": {
+			"keccak256": "0xaa3852717be1903bf8b8a66c7ce323f70ac93227769c450f2b332fdd16bd9198",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://09ce2e4a5b1064a392594c0d5efeb3ccd8eacf431e55a85574cafb6bfb72ba69",
+				"dweb:/ipfs/QmUbT5UomYpwwMrNMzzuNcGb4sxuMZ4jz8mMPZewX8mEPn"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC721/extensions/IERC721Metadata.sol": {
+			"keccak256": "0xf46268c37522320bb2119a5a394bc5c739a95c0c574c8d08e8c643f4d06e5c76",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://517e4b295f35b9947c72ad7379a6089439ece7bb6f4a2ea0a159da13046c039e",
+				"dweb:/ipfs/QmZXzkSfLUbvujig3zVbpDHykpHhqLpvQtdiN3B5j4TA3u"
+			]
+		},
+		"@openzeppelin/contracts/token/ERC721/utils/ERC721Utils.sol": {
+			"keccak256": "0xc2dfdc8fbc8fdb142575c90568e237b809a1feaccff23e32d00131887a08dc36",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://dbc1d283ee77da43d61661b5ba1adeb427d6a6224335494a9a857dce41d9f1d6",
+				"dweb:/ipfs/QmTnA35z7XzkxFSRUqB6CGVH1nhmvajwnDNfA5PiKmYuCi"
 			]
 		},
 		"@openzeppelin/contracts/utils/Arrays.sol": {
@@ -2779,6 +3209,14 @@
 				"dweb:/ipfs/QmarDJ5hZEgBtCmmrVzEZWjub9769eD686jmzb2XpSU1cM"
 			]
 		},
+		"@openzeppelin/contracts/utils/Strings.sol": {
+			"keccak256": "0xad148d59f05165f9217d0a9e1ac8f772abb02ea6aaad8a756315c532bf79f9f4",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://15e3599867c2182f5831e9268b274b2ef2047825837df6b4d81c9e89254b093e",
+				"dweb:/ipfs/QmZbL7XAYr5RmaNaooPgZRmcDXaudfsYQfYD9y5iAECvpS"
+			]
+		},
 		"@openzeppelin/contracts/utils/introspection/ERC165.sol": {
 			"keccak256": "0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e",
 			"license": "MIT",
@@ -2811,6 +3249,14 @@
 				"dweb:/ipfs/QmPFKL2r9CBsMwmUqqdcFPfHZB2qcs9g1HDrPxzWSxomvy"
 			]
 		},
+		"@openzeppelin/contracts/utils/math/SignedMath.sol": {
+			"keccak256": "0xb1970fac7b64e6c09611e6691791e848d5e3fe410fa5899e7df2e0afd77a99e3",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://db5fbb3dddd8b7047465b62575d96231ba8a2774d37fb4737fbf23340fabbb03",
+				"dweb:/ipfs/QmVUSvooZKEdEdap619tcJjTLcAuH6QBdZqAzWwnAXZAWJ"
+			]
+		},
 		"@openzeppelin/contracts/utils/structs/EnumerableSet.sol": {
 			"keccak256": "0x1fc283df727585919c3db301b948a3e827aee16917457ad7f916db9da2228e77",
 			"license": "MIT",
@@ -2828,11 +3274,11 @@
 			]
 		},
 		"src/AviatorStakingPool.sol": {
-			"keccak256": "0xc0f9a0ed4c090a30016d1b5f5c3e1c5350de0649ee2feda06a5a65c7561cea31",
+			"keccak256": "0xa3981776b9a54039eb61e4a7ee02449e82f8506e67899833cb436825e768978f",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://52a6a02f3a0237947c37ddfc1c4ae5cac16a6289480fe52b845b274dc83f656d",
-				"dweb:/ipfs/QmfY3UA4eQpTpEE11pTKxjGswpfRSfkaRnruKWm66t4gxa"
+				"bzz-raw://b175618da9675aa253ef6e916da1a794d44abb4ec3208732b1393fdb38337e4b",
+				"dweb:/ipfs/QmPpVkaDksRC1eHvCs1TRg6mgS2TpReoAd9wbWYCx8r3tp"
 			]
 		}
 	},

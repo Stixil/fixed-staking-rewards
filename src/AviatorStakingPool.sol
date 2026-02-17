@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.29;
 
-import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Pausable.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/utils/Pausable.sol";
 import "@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
 import "./AviatorRewardsVault.sol";
@@ -11,42 +12,41 @@ import "./AviatorRewardsVault.sol";
 /* ========== CUSTOM ERRORS ========== */
 
 error CannotStakeZero(string reason);
-error NotEnoughRewards(uint256 available, uint256 required);
-error RewardsNotAvailableYet(uint256 currentTime, uint256 availableTime);
-error CannotWithdrawZero(string reason);
-error CannotWithdrawStakingToken(address attemptedToken);
 error IsBlacklisted(address account, string reason);
+error IsFrozen(address account, string reason);
 error LockDurationTooShort(uint256 provided, uint256 minimum);
 error DepositStillLocked(uint256 currentTime, uint256 unlockTime);
-error InsufficientUnlockedBalance(uint256 requested, uint256 available);
-error InvalidStakeId(uint256 stakeId);
 error TokenNotWhitelisted(address token);
 error TokenAlreadyWhitelisted(address token);
+error NotStakeOwner(uint256 tokenId);
+error StakeAlreadyWithdrawn(uint256 tokenId);
 
-contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnumerable {
+contract AviatorStakingPool is ERC721Enumerable, Pausable, ReentrancyGuard, AccessControlEnumerable {
     using SafeERC20 for IERC20;
 
     /* ========== ROLES ========== */
 
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
+    bytes32 public constant FREEZER_ROLE = keccak256("FREEZER_ROLE");
 
     /* ========== STRUCTS ========== */
 
-    /// @notice Individual stake position
-    struct StakePosition {
-        uint256 amount;
-        uint256 unlockTime;
-        bool withdrawn;
+    /// @notice Individual stake represented as NFT
+    struct StakeNFT {
+        uint256 amount;      // Amount staked
+        uint256 unlockTime;  // When it can be withdrawn
+        uint256 stakeTime;   // When it was created
+        bool withdrawn;      // Has it been withdrawn
     }
 
     /// @notice Reward schedule for a token
     struct RewardSchedule {
-        uint256 rewardRate; // Tokens per second
+        uint256 rewardRate;      // Tokens per second
         uint256 startTime;
         uint256 endTime;
         uint256 totalSupplied;
-        uint256 pausedAt; // Timestamp when paused (0 if active)
+        uint256 pausedAt;        // Timestamp when paused (0 if active)
         uint256 totalPausedTime; // Cumulative pause duration
     }
 
@@ -55,9 +55,15 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     IERC20 public immutable stakingToken;
     AviatorRewardsVault public immutable vault;
     
+    uint256 public nextTokenId = 1;  // NFT token ID counter
+    uint256 public totalStakedAmount; // Total amount staked across all NFTs
+    
     uint256 public minimumLockDuration; // Configurable minimum lock duration
-    uint256 public claimFeeETH; // ETH fee for claiming rewards
-    address public feeReceiver; // Address that receives ETH claim fees
+    uint256 public claimFeeETH;         // ETH fee for claiming rewards
+    address public feeReceiver;         // Address that receives ETH claim fees
+
+    // NFT stake data
+    mapping(uint256 => StakeNFT) public stakes;
 
     // Reward token whitelist
     mapping(address => bool) public whitelistedRewardTokens;
@@ -72,16 +78,13 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     mapping(address => mapping(address => uint256)) public userRewardPerTokenPaidPerToken;
     mapping(address => mapping(address => uint256)) public rewardsPerToken;
 
+    // Freeze tracking
+    mapping(address => bool) public frozen;
+
     // Blacklist
     mapping(address => bool) public blacklist;
 
-    // Staking tracking
-    mapping(address => uint256) public userStaked; // Total staked by user
-    mapping(address => uint256) public lastStakeTime;
-    mapping(address => StakePosition[]) public userStakePositions;
-    mapping(address => uint256) public userStakeCount;
-
-    // Pause tracking for when totalSupply == 0
+    // Pause tracking for when totalStakedAmount == 0
     uint256 public lastTotalSupplyZeroTime;
     bool public wasTotalSupplyZero;
 
@@ -92,27 +95,45 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     /// @param _stakingToken The token users will stake
     /// @param _vault The rewards vault address
     constructor(address _admin, address _stakingToken, address _vault)
-        ERC20("RewardsStakedAVI", "stAVI")
+        ERC721("Aviator Stake Position", "stAVI-NFT")
     {
         stakingToken = IERC20(_stakingToken);
         vault = AviatorRewardsVault(_vault);
         minimumLockDuration = 12 weeks; // Default to 12 weeks
-        claimFeeETH = 0.005 ether; // Default 0.005 ETH
-        feeReceiver = _admin; // Default fee receiver is admin
+        claimFeeETH = 0.005 ether;      // Default 0.005 ETH
+        feeReceiver = _admin;           // Default fee receiver is admin
         
         // Setup roles
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(ADMIN_ROLE, _admin);
         _grantRole(PAUSER_ROLE, _admin);
+        _grantRole(FREEZER_ROLE, _admin);
     }
 
     /* ========== VIEWS ========== */
+
+    /// @notice Get total staked amount for a user (sum of all their NFT stakes)
+    /// @param account The address to check
+    /// @return Total amount staked
+    function balanceOfStaked(address account) public view returns (uint256) {
+        uint256 nftBalance = balanceOf(account);
+        uint256 total = 0;
+        
+        for (uint256 i = 0; i < nftBalance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(account, i);
+            if (!stakes[tokenId].withdrawn) {
+                total += stakes[tokenId].amount;
+            }
+        }
+        
+        return total;
+    }
 
     /// @notice Calculates the current reward per token for a specific reward token
     /// @param token The reward token address
     /// @return The reward per token value
     function rewardPerToken(address token) public view returns (uint256) {
-        if (totalSupply() == 0) {
+        if (totalStakedAmount == 0) {
             return rewardPerTokenStoredPerToken[token];
         }
 
@@ -143,11 +164,11 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     /// @param token The reward token address
     /// @return The amount of rewards earned
     function earned(address account, address token) public view returns (uint256) {
-        return (balanceOf(account) * (rewardPerToken(token) - userRewardPerTokenPaidPerToken[account][token])) / 1e18 
+        return (balanceOfStaked(account) * (rewardPerToken(token) - userRewardPerTokenPaidPerToken[account][token])) / 1e18 
             + rewardsPerToken[account][token];
     }
 
-    /// @notice Returns the total rewards earned by an account (legacy interface compatibility)
+    /// @notice Returns the total rewards earned by an account (first whitelisted token)
     /// @param account The address to check rewards for
     /// @return The amount of rewards earned for the first whitelisted token
     function earned(address account) public view returns (uint256) {
@@ -157,7 +178,7 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         return 0;
     }
 
-    /// @notice Gets the total reward amount for a 14-day period (legacy interface)
+    /// @notice Gets the total reward amount for a 14-day period
     /// @return The reward amount for the duration
     function getRewardForDuration() public view returns (uint256) {
         if (rewardTokensList.length > 0) {
@@ -173,16 +194,26 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         return blacklist[account];
     }
 
+    /// @notice Checks if an address is frozen
+    /// @param account The address to check
+    /// @return True if frozen, false otherwise
+    function isFrozen(address account) public view returns (bool) {
+        return frozen[account];
+    }
+
     /// @notice Get the unlocked balance for a user
     /// @param account The address to check
     /// @return The amount of tokens that are unlocked and can be withdrawn
     function getUnlockedBalance(address account) public view returns (uint256) {
+        uint256 nftBalance = balanceOf(account);
         uint256 unlocked = 0;
-        StakePosition[] storage positions = userStakePositions[account];
         
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (!positions[i].withdrawn && block.timestamp >= positions[i].unlockTime) {
-                unlocked += positions[i].amount;
+        for (uint256 i = 0; i < nftBalance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(account, i);
+            StakeNFT storage stakeData = stakes[tokenId];
+            
+            if (!stakeData.withdrawn && block.timestamp >= stakeData.unlockTime) {
+                unlocked += stakeData.amount;
             }
         }
         
@@ -193,41 +224,56 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     /// @param account The address to check
     /// @return The amount of tokens that are still locked
     function getLockedBalance(address account) public view returns (uint256) {
+        uint256 nftBalance = balanceOf(account);
         uint256 locked = 0;
-        StakePosition[] storage positions = userStakePositions[account];
         
-        for (uint256 i = 0; i < positions.length; i++) {
-            if (!positions[i].withdrawn && block.timestamp < positions[i].unlockTime) {
-                locked += positions[i].amount;
+        for (uint256 i = 0; i < nftBalance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(account, i);
+            StakeNFT storage stakeData = stakes[tokenId];
+            
+            if (!stakeData.withdrawn && block.timestamp < stakeData.unlockTime) {
+                locked += stakeData.amount;
             }
         }
         
         return locked;
     }
 
-    /// @notice Get all stake positions for a user
+    /// @notice Get all stake NFT IDs for a user
     /// @param account The address to check
-    /// @return Array of stake positions
-    function getUserStakePositions(address account) external view returns (StakePosition[] memory) {
-        return userStakePositions[account];
-    }
-
-    /// @notice Get a specific stake position
-    /// @param account The address to check
-    /// @param stakeId The index of the stake position
-    /// @return The stake position
-    function getStakePosition(address account, uint256 stakeId) external view returns (StakePosition memory) {
-        if (stakeId >= userStakePositions[account].length) {
-            revert InvalidStakeId(stakeId);
+    /// @return Array of token IDs
+    function getUserStakeIds(address account) external view returns (uint256[] memory) {
+        uint256 nftBalance = balanceOf(account);
+        uint256[] memory tokenIds = new uint256[](nftBalance);
+        
+        for (uint256 i = 0; i < nftBalance; i++) {
+            tokenIds[i] = tokenOfOwnerByIndex(account, i);
         }
-        return userStakePositions[account][stakeId];
+        
+        return tokenIds;
     }
 
-    /// @notice Get total number of stake positions for a user
+    /// @notice Get all stake positions for a user with full details
     /// @param account The address to check
-    /// @return The number of stake positions
-    function getUserStakePositionCount(address account) external view returns (uint256) {
-        return userStakePositions[account].length;
+    /// @return Array of stake NFT data
+    function getUserStakePositions(address account) external view returns (StakeNFT[] memory) {
+        uint256 nftBalance = balanceOf(account);
+        StakeNFT[] memory positions = new StakeNFT[](nftBalance);
+        
+        for (uint256 i = 0; i < nftBalance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(account, i);
+            positions[i] = stakes[tokenId];
+        }
+        
+        return positions;
+    }
+
+    /// @notice Get a specific stake position by token ID
+    /// @param tokenId The NFT token ID
+    /// @return The stake position
+    function getStakePosition(uint256 tokenId) external view returns (StakeNFT memory) {
+        require(_ownerOf(tokenId) != address(0), "Token does not exist");
+        return stakes[tokenId];
     }
 
     /// @notice Get all whitelisted reward tokens
@@ -261,24 +307,27 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    /// @notice Stake tokens with default minimum lock period (interface compatibility)
+    /// @notice Stake tokens with default minimum lock period
     /// @param amount The amount of tokens to stake
-    function stake(uint256 amount) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
-        _stakeWithLock(msg.sender, amount, minimumLockDuration);
+    /// @return tokenId The NFT token ID representing this stake
+    function stakeTokens(uint256 amount) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotFrozenOrBlacklisted returns (uint256) {
+        return _stakeWithLock(msg.sender, amount, minimumLockDuration);
     }
 
     /// @notice Stake tokens with a custom time lock (with bonus rewards)
     /// @param amount The amount of tokens to stake
     /// @param lock The lock duration in seconds (must be at least minimumLockDuration)
-    function stakeWithBonus(uint256 amount, uint256 lock) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
-        _stakeWithLock(msg.sender, amount, lock);
+    /// @return tokenId The NFT token ID representing this stake
+    function stakeWithBonus(uint256 amount, uint256 lock) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotFrozenOrBlacklisted returns (uint256) {
+        return _stakeWithLock(msg.sender, amount, lock);
     }
 
     /// @notice Internal stake implementation
     /// @param user The user address staking
     /// @param amount The amount of tokens to stake
     /// @param lock The lock duration in seconds
-    function _stakeWithLock(address user, uint256 amount, uint256 lock) internal {
+    /// @return tokenId The NFT token ID
+    function _stakeWithLock(address user, uint256 amount, uint256 lock) internal returns (uint256) {
         require(amount > 0, "Cannot stake 0");
         
         // Check minimum lock duration
@@ -289,98 +338,93 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         // Transfer tokens from user to contract
         stakingToken.safeTransferFrom(user, address(this), amount);
 
-        // Mint staking receipt tokens (stAVI) to user
-        _mint(user, amount);
+        // Mint NFT to user
+        uint256 tokenId = nextTokenId++;
+        _safeMint(user, tokenId);
 
-        // Create new stake position
-        userStakePositions[user].push(StakePosition({
+        // Store stake data
+        stakes[tokenId] = StakeNFT({
             amount: amount,
             unlockTime: block.timestamp + lock,
+            stakeTime: block.timestamp,
             withdrawn: false
-        }));
+        });
 
-        // Update user's total stake
-        userStaked[user] += amount;
-        userStakeCount[user]++;
-        lastStakeTime[user] = block.timestamp;
+        // Update total staked
+        totalStakedAmount += amount;
 
-        emit Staked(user, amount, lock);
+        emit Staked(user, tokenId, amount, lock);
+        
+        return tokenId;
     }
 
-    /// @notice Withdraw unlocked staked tokens
-    /// @param amount The amount of tokens to withdraw
-    function withdraw(uint256 amount) public nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
-        require(amount > 0, "Cannot withdraw 0");
-        
-        uint256 availableToWithdraw = getUnlockedBalance(msg.sender);
-        
-        if (amount > availableToWithdraw) {
-            revert InsufficientUnlockedBalance(amount, availableToWithdraw);
+    /// @notice Withdraw a specific stake position by NFT token ID
+    /// @param tokenId The NFT token ID to withdraw
+    function withdraw(uint256 tokenId) public nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotFrozenOrBlacklisted {
+        if (ownerOf(tokenId) != msg.sender) {
+            revert NotStakeOwner(tokenId);
         }
 
-        // Withdraw from unlocked positions (FIFO)
-        uint256 remaining = amount;
-        StakePosition[] storage positions = userStakePositions[msg.sender];
+        StakeNFT storage stakeData = stakes[tokenId];
         
-        for (uint256 i = 0; i < positions.length && remaining > 0; i++) {
-            if (!positions[i].withdrawn && block.timestamp >= positions[i].unlockTime) {
-                if (positions[i].amount <= remaining) {
-                    // Withdraw entire position
-                    remaining -= positions[i].amount;
-                    positions[i].withdrawn = true;
-                } else {
-                    // Partial withdrawal - split the position
-                    positions[i].amount -= remaining;
-                    remaining = 0;
-                }
+        if (stakeData.withdrawn) {
+            revert StakeAlreadyWithdrawn(tokenId);
+        }
+        
+        if (block.timestamp < stakeData.unlockTime) {
+            revert DepositStillLocked(block.timestamp, stakeData.unlockTime);
+        }
+
+        uint256 amount = stakeData.amount;
+        stakeData.withdrawn = true;
+
+        // Update total staked
+        totalStakedAmount -= amount;
+
+        // Burn NFT
+        _burn(tokenId);
+
+        // Transfer tokens back to user
+        stakingToken.safeTransfer(msg.sender, amount);
+
+        emit Withdrawn(msg.sender, tokenId, amount);
+    }
+
+    /// @notice Withdraw multiple stake positions at once
+    /// @param tokenIds Array of NFT token IDs to withdraw
+    function withdrawMultiple(uint256[] calldata tokenIds) external {
+        for (uint256 i = 0; i < tokenIds.length; i++) {
+            withdraw(tokenIds[i]);
+        }
+    }
+
+    /// @notice Withdraw all unlocked stake positions
+    function withdrawAllUnlocked() external {
+        uint256 nftBalance = balanceOf(msg.sender);
+        
+        // Collect unlocked token IDs
+        uint256[] memory unlockedIds = new uint256[](nftBalance);
+        uint256 count = 0;
+        
+        for (uint256 i = 0; i < nftBalance; i++) {
+            uint256 tokenId = tokenOfOwnerByIndex(msg.sender, i);
+            StakeNFT storage stakeData = stakes[tokenId];
+            
+            if (!stakeData.withdrawn && block.timestamp >= stakeData.unlockTime) {
+                unlockedIds[count] = tokenId;
+                count++;
             }
         }
-
-        // Update user's stake
-        userStaked[msg.sender] -= amount;
-
-        // Burn staking receipt tokens
-        _burn(msg.sender, amount);
-
-        // Transfer tokens back to user
-        stakingToken.safeTransfer(msg.sender, amount);
-
-        emit Withdrawn(msg.sender, amount);
-    }
-
-    /// @notice Withdraw a specific stake position by ID
-    /// @param stakeId The ID of the stake position to withdraw
-    function withdrawStakePosition(uint256 stakeId) external nonReentrant updateRewardForAllTokens(msg.sender) whenNotPaused whenNotBlacklisted {
-        if (stakeId >= userStakePositions[msg.sender].length) {
-            revert InvalidStakeId(stakeId);
-        }
-
-        StakePosition storage position = userStakePositions[msg.sender][stakeId];
         
-        require(!position.withdrawn, "Position already withdrawn");
-        
-        if (block.timestamp < position.unlockTime) {
-            revert DepositStillLocked(block.timestamp, position.unlockTime);
+        // Withdraw all unlocked
+        for (uint256 i = 0; i < count; i++) {
+            withdraw(unlockedIds[i]);
         }
-
-        uint256 amount = position.amount;
-        position.withdrawn = true;
-
-        // Update user's stake
-        userStaked[msg.sender] -= amount;
-
-        // Burn staking receipt tokens
-        _burn(msg.sender, amount);
-
-        // Transfer tokens back to user
-        stakingToken.safeTransfer(msg.sender, amount);
-
-        emit Withdrawn(msg.sender, amount);
     }
 
     /// @notice Claim rewards for a specific token
     /// @param token The reward token to claim
-    function getRewardForToken(address token) public payable nonReentrant updateRewardForToken(token, msg.sender) whenNotPaused whenNotBlacklisted {
+    function getRewardForToken(address token) public payable nonReentrant updateRewardForToken(token, msg.sender) whenNotPaused whenNotFrozenOrBlacklisted {
         require(msg.value >= claimFeeETH, "Insufficient claim fee");
         
         uint256 reward = rewardsPerToken[msg.sender][token];
@@ -399,17 +443,8 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         }
     }
 
-    /// @notice Claim accumulated rewards (legacy interface - claims first whitelisted token)
-    function getReward() public nonReentrant whenNotPaused whenNotBlacklisted {
-        if (rewardTokensList.length > 0) {
-            // For legacy compatibility, just update rewards without claiming
-            // Users should use getRewardForToken or getAllRewards
-            _updateRewardForToken(rewardTokensList[0], msg.sender);
-        }
-    }
-
     /// @notice Claim all rewards across all whitelisted tokens (single ETH fee)
-    function getAllRewards() external payable nonReentrant whenNotPaused whenNotBlacklisted {
+    function getAllRewards() external payable nonReentrant whenNotPaused whenNotFrozenOrBlacklisted {
         require(msg.value >= claimFeeETH, "Insufficient claim fee");
         
         bool claimedAny = false;
@@ -435,16 +470,71 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         }
     }
 
-    /// @notice Withdraw all unlocked staked tokens and claim all rewards
-    function exit() external whenNotPaused whenNotBlacklisted {
-        uint256 unlockedBalance = getUnlockedBalance(msg.sender);
-        if (unlockedBalance > 0) {
-            withdraw(unlockedBalance);
-        }
-        // Note: getReward() is legacy, users should call getAllRewards() separately with ETH
+    /* ========== FREEZE FUNCTIONS  ========== */
+
+    /// @notice Freeze a wallet for compliance purposes (rewards still accrue)
+    /// @param account Address to freeze
+    function freezeWallet(address account) external onlyRole(FREEZER_ROLE) {
+        require(!frozen[account], "Already frozen");
+        frozen[account] = true;
+        emit WalletFrozen(account, block.timestamp);
     }
 
-    /* ========== RESTRICTED FUNCTIONS ========== */
+    /// @notice Unfreeze a wallet
+    /// @param account Address to unfreeze
+    function unfreezeWallet(address account) external onlyRole(FREEZER_ROLE) {
+        require(frozen[account], "Not frozen");
+        frozen[account] = false;
+        emit WalletUnfrozen(account, block.timestamp);
+    }
+
+    /* ========== BLACKLIST FUNCTIONS ========== */
+
+    /// @notice Blacklist an address and return their stake (forfeit all rewards as penalty)
+    /// @param account Address to blacklist
+    function blacklistWallet(address account) external onlyRole(ADMIN_ROLE) updateRewardForAllTokens(account) {
+        blacklist[account] = true;
+        
+        // Get all user's NFTs
+        uint256 nftBalance = balanceOf(account);
+        uint256 totalToReturn = 0;
+        
+        if (nftBalance > 0) {
+            // Process all stakes - mark as withdrawn but don't burn NFT
+            for (uint256 i = 0; i < nftBalance; i++) {
+                uint256 tokenId = tokenOfOwnerByIndex(account, i);
+                StakeNFT storage stakeData = stakes[tokenId];
+                
+                if (!stakeData.withdrawn) {
+                    totalToReturn += stakeData.amount;
+                    stakeData.withdrawn = true; // Voids the NFT
+                    totalStakedAmount -= stakeData.amount;
+                }
+            }
+            
+            // Forfeit all rewards for all tokens (penalty for breaking TOS)
+            for (uint256 i = 0; i < rewardTokensList.length; i++) {
+                rewardsPerToken[account][rewardTokensList[i]] = 0;
+            }
+            
+            // Return staked tokens to user (we don't confiscate principal)
+            if (totalToReturn > 0) {
+                stakingToken.safeTransfer(account, totalToReturn);
+                emit StakeReturnedDueToBlacklist(account, totalToReturn);
+            }
+        }
+        
+        emit BlacklistAdded(account);
+    }
+
+    /// @notice Remove an address from the blacklist
+    /// @param account Address to remove from blacklist
+    function unblacklistWallet(address account) external onlyRole(ADMIN_ROLE) {
+        blacklist[account] = false;
+        emit BlacklistRemoved(account);
+    }
+
+    /* ========== ADMIN FUNCTIONS ========== */
 
     /// @notice Add a token to the rewards whitelist
     /// @param token The token address to whitelist
@@ -532,49 +622,6 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         emit FeeReceiverSet(_feeReceiver);
     }
 
-    /// @notice Add an address to the blacklist and return their staked tokens (forfeit all rewards)
-    /// @param account Address to blacklist
-    function blacklistWallet(address account) external onlyRole(ADMIN_ROLE) updateRewardForAllTokens(account) {
-        blacklist[account] = true;
-        
-        // Return all staked tokens to user (both locked and unlocked)
-        uint256 totalStaked = userStaked[account];
-        if (totalStaked > 0) {
-            // Mark all positions as withdrawn
-            StakePosition[] storage positions = userStakePositions[account];
-            for (uint256 i = 0; i < positions.length; i++) {
-                if (!positions[i].withdrawn) {
-                    positions[i].withdrawn = true;
-                }
-            }
-            
-            // Reset user's stake
-            userStaked[account] = 0;
-            
-            // Forfeit all rewards for all tokens
-            for (uint256 i = 0; i < rewardTokensList.length; i++) {
-                rewardsPerToken[account][rewardTokensList[i]] = 0;
-            }
-            
-            // Burn staking receipt tokens
-            _burn(account, totalStaked);
-            
-            // Return staked tokens to user
-            stakingToken.safeTransfer(account, totalStaked);
-            
-            emit StakeReturnedDueToBlacklist(account, totalStaked);
-        }
-        
-        emit BlacklistAdded(account);
-    }
-
-    /// @notice Remove an address from the blacklist
-    /// @param account Address to remove from blacklist
-    function unblacklistWallet(address account) external onlyRole(ADMIN_ROLE) {
-        blacklist[account] = false;
-        emit BlacklistRemoved(account);
-    }
-
     /// @notice Emergency withdraw ETH from contract
     /// @param recipient Address to receive the ETH
     /// @param amount Amount of ETH to withdraw
@@ -583,14 +630,14 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         emit EmergencyWithdrawETH(msg.sender, recipient, amount);
     }
 
-    /// @notice Emergency withdraw ERC20 tokens from contract
+    /// @notice Emergency withdraw ERC20 tokens from contract (use for court-ordered confiscations)
+    /// @param tokenAddress The ERC20 token address
     /// @param recipient Address to receive the tokens
     /// @param amount Amount of tokens to withdraw
     function emergencyWithdrawERC20(address tokenAddress, address recipient, uint256 amount) external onlyRole(ADMIN_ROLE) {
         IERC20(tokenAddress).safeTransfer(recipient, amount);
         emit EmergencyWithdrawERC20(msg.sender, tokenAddress, recipient, amount);
     }
-
 
     /// @notice Emergency withdraw ERC721 NFTs from contract
     /// @param tokenAddress The ERC721 token address
@@ -616,11 +663,11 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
 
     /// @notice Internal function to update rewards for a specific token and account
     function _updateRewardForToken(address token, address account) internal {
-        // Handle pause/resume logic when totalSupply changes
+        // Handle pause/resume logic when totalStakedAmount changes
         _handleSupplyChange();
         
         // Update reward per token stored
-        if (totalSupply() > 0) {
+        if (totalStakedAmount > 0) {
             uint256 activeRate = getActiveRewardRate(token);
             uint256 timeDelta = block.timestamp - lastUpdateTimePerToken[token];
             rewardPerTokenStoredPerToken[token] += (timeDelta * activeRate);
@@ -635,9 +682,9 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         }
     }
 
-    /// @notice Handle pause/resume of reward schedules when totalSupply changes
+    /// @notice Handle pause/resume of reward schedules when totalStakedAmount changes
     function _handleSupplyChange() internal {
-        bool isZeroNow = (totalSupply() == 0);
+        bool isZeroNow = (totalStakedAmount == 0);
         
         if (isZeroNow && !wasTotalSupplyZero) {
             // Just hit zero - pause all schedules
@@ -677,8 +724,17 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         }
     }
 
-    /// @notice Override ERC20 _update to update rewards on token transfers
-    function _update(address from, address to, uint256 value) internal override(ERC20Pausable) {
+    /// @notice Override _update to block transfers from frozen wallets and update rewards
+    function _update(address to, uint256 tokenId, address auth) internal override(ERC721Enumerable) returns (address) {
+        address from = _ownerOf(tokenId);
+        
+        // Block transfers from frozen accounts (compliance hold)
+        if (from != address(0)) { // Not a mint
+            if (frozen[from]) {
+                revert IsFrozen(from, "Cannot transfer: account is frozen");
+            }
+        }
+        
         // Update rewards for both sender and receiver for all tokens
         for (uint256 i = 0; i < rewardTokensList.length; i++) {
             address token = rewardTokensList[i];
@@ -688,11 +744,17 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
             }
         }
         
-        super._update(from, to, value);
+        return super._update(to, tokenId, auth);
     }
 
-    /// @notice Override supportsInterface for AccessControlEnumerable
-    function supportsInterface(bytes4 interfaceId) public view virtual override(AccessControlEnumerable) returns (bool) {
+    /// @notice Override supportsInterface for multiple inheritance
+    function supportsInterface(bytes4 interfaceId) 
+        public 
+        view 
+        virtual 
+        override(ERC721Enumerable, AccessControlEnumerable) 
+        returns (bool) 
+    {
         return super.supportsInterface(interfaceId);
     }
 
@@ -715,10 +777,13 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
         _;
     }
 
-    /// @notice Prevents blacklisted addresses from calling function
-    modifier whenNotBlacklisted() {
+    /// @notice Prevents frozen or blacklisted addresses from calling function
+    modifier whenNotFrozenOrBlacklisted() {
+        if (frozen[msg.sender]) {
+            revert IsFrozen(msg.sender, "Account is frozen for compliance purposes");
+        }
         if (blacklist[msg.sender]) {
-            revert IsBlacklisted(msg.sender, "You are not allowed to interact with this contract.");
+            revert IsBlacklisted(msg.sender, "Account is blacklisted");
         }
         _;
     }
@@ -728,9 +793,11 @@ contract AviatorStakingPool is ERC20Pausable, ReentrancyGuard, AccessControlEnum
     event RewardTokenAdded(address indexed token);
     event RewardTokenRemoved(address indexed token);
     event RewardAdded(address indexed token, uint256 amount, uint256 duration, uint256 rewardRate);
-    event Staked(address indexed user, uint256 amount, uint256 lock);
-    event Withdrawn(address indexed user, uint256 amount);
+    event Staked(address indexed user, uint256 indexed tokenId, uint256 amount, uint256 lock);
+    event Withdrawn(address indexed user, uint256 indexed tokenId, uint256 amount);
     event RewardPaid(address indexed user, address indexed token, uint256 reward);
+    event WalletFrozen(address indexed account, uint256 timestamp);
+    event WalletUnfrozen(address indexed account, uint256 timestamp);
     event BlacklistAdded(address indexed account);
     event BlacklistRemoved(address indexed account);
     event StakeReturnedDueToBlacklist(address indexed account, uint256 amount);
