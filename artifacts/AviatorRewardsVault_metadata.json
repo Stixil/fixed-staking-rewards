@@ -6,13 +6,7 @@
 	"output": {
 		"abi": [
 			{
-				"inputs": [
-					{
-						"internalType": "address",
-						"name": "_admin",
-						"type": "address"
-					}
-				],
+				"inputs": [],
 				"stateMutability": "nonpayable",
 				"type": "constructor"
 			},
@@ -38,6 +32,16 @@
 				"type": "error"
 			},
 			{
+				"inputs": [],
+				"name": "InvalidInitialization",
+				"type": "error"
+			},
+			{
+				"inputs": [],
+				"name": "NotInitializing",
+				"type": "error"
+			},
+			{
 				"inputs": [
 					{
 						"internalType": "address",
@@ -47,31 +51,6 @@
 				],
 				"name": "SafeERC20FailedOperation",
 				"type": "error"
-			},
-			{
-				"anonymous": false,
-				"inputs": [
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "token",
-						"type": "address"
-					},
-					{
-						"indexed": true,
-						"internalType": "address",
-						"name": "recipient",
-						"type": "address"
-					},
-					{
-						"indexed": false,
-						"internalType": "uint256",
-						"name": "amount",
-						"type": "uint256"
-					}
-				],
-				"name": "EmergencyWithdraw",
-				"type": "event"
 			},
 			{
 				"anonymous": false,
@@ -158,6 +137,19 @@
 					}
 				],
 				"name": "EmergencyWithdrawETH",
+				"type": "event"
+			},
+			{
+				"anonymous": false,
+				"inputs": [
+					{
+						"indexed": false,
+						"internalType": "uint64",
+						"name": "version",
+						"type": "uint64"
+					}
+				],
+				"name": "Initialized",
 				"type": "event"
 			},
 			{
@@ -509,6 +501,19 @@
 				"inputs": [
 					{
 						"internalType": "address",
+						"name": "_admin",
+						"type": "address"
+					}
+				],
+				"name": "initialize",
+				"outputs": [],
+				"stateMutability": "nonpayable",
+				"type": "function"
+			},
+			{
+				"inputs": [
+					{
+						"internalType": "address",
 						"name": "user",
 						"type": "address"
 					},
@@ -635,6 +640,16 @@
 						"details": "The `account` is missing a role."
 					}
 				],
+				"InvalidInitialization()": [
+					{
+						"details": "The contract is already initialized."
+					}
+				],
+				"NotInitializing()": [
+					{
+						"details": "The contract is not initializing."
+					}
+				],
 				"SafeERC20FailedOperation(address)": [
 					{
 						"details": "An operation with an ERC-20 token failed."
@@ -642,6 +657,9 @@
 				]
 			},
 			"events": {
+				"Initialized(uint64)": {
+					"details": "Triggered when the contract has been initialized or reinitialized."
+				},
 				"RoleAdminChanged(bytes32,bytes32,bytes32)": {
 					"details": "Emitted when `newAdminRole` is set as ``role``'s admin role, replacing `previousAdminRole` `DEFAULT_ADMIN_ROLE` is the starting admin for all roles, despite {RoleAdminChanged} not being emitted to signal this."
 				},
@@ -654,10 +672,14 @@
 			},
 			"kind": "dev",
 			"methods": {
+				"constructor": {
+					"custom:oz-upgrades-unsafe-allow": "constructor"
+				},
 				"emergencyWithdrawERC20(address,address,uint256)": {
 					"params": {
 						"amount": "Amount of tokens to withdraw",
-						"recipient": "Address to receive the tokens"
+						"recipient": "Address to receive the tokens",
+						"tokenAddress": "The ERC20 token address"
 					}
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
@@ -699,6 +721,11 @@
 				"hasRole(bytes32,address)": {
 					"details": "Returns `true` if `account` has been granted `role`."
 				},
+				"initialize(address)": {
+					"params": {
+						"_admin": "The address that will have admin and treasury roles"
+					}
+				},
 				"payReward(address,address,uint256)": {
 					"params": {
 						"amount": "The amount to pay",
@@ -724,16 +751,19 @@
 			"kind": "user",
 			"methods": {
 				"emergencyWithdrawERC20(address,address,uint256)": {
-					"notice": "Emergency withdraw ERC20 tokens from contract"
+					"notice": "Emergency withdraw ERC20 tokens from vault (use for court-ordered confiscations)"
 				},
 				"emergencyWithdrawERC721(address,address,uint256)": {
-					"notice": "Emergency withdraw ERC721 NFTs from contract"
+					"notice": "Emergency withdraw ERC721 NFTs from vault"
 				},
 				"emergencyWithdrawETH(address,uint256)": {
-					"notice": "Emergency withdraw ETH from contract"
+					"notice": "Emergency withdraw ETH from vault"
 				},
 				"getBalance(address)": {
 					"notice": "Get token balance in vault"
+				},
+				"initialize(address)": {
+					"notice": "Initializes the vault contract"
 				},
 				"payReward(address,address,uint256)": {
 					"notice": "Pay reward to user (only callable by staking contract)"
@@ -764,12 +794,44 @@
 		"remappings": []
 	},
 	"sources": {
-		"@openzeppelin/contracts/access/AccessControl.sol": {
-			"keccak256": "0x1a6b4f6b7798ab80929d491b89d5427a9b3338c0fd1acd0ba325f69c6f1646af",
+		"@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol": {
+			"keccak256": "0x85a70e2b1b65e9ba456add364d22b97eb9944083df1c39c0b4bd6a4b5aa386a4",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://7bb7f346c12a14dc622bc105ce3c47202fbc89f4b153a28a63bb68193297330c",
-				"dweb:/ipfs/QmagwF8P3bUBXwdo159ueEnY9dLSvEWwK24kk2op58egwG"
+				"bzz-raw://d32a33be6ca4d8e89b9e82e3f9cec7a6c4e040534152313ff55da85b8f193059",
+				"dweb:/ipfs/QmeR55L8t2A8xZ1nvT5y4yVWfFbbmpaGAtGBMz3GGNpuyP"
+			]
+		},
+		"@openzeppelin/contracts-upgradeable/access/extensions/AccessControlEnumerableUpgradeable.sol": {
+			"keccak256": "0x52d72be5f7529846ba76aacf0c49de92bde89a5203b6fbc3919e7384c0df0905",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://0d5e789d39c6623db24d427ca8380978f44cc736070e2ac3ee19f88095c43b17",
+				"dweb:/ipfs/QmSzyMMTnZrUWY2e4B2U3VE2fjz8AFawhk7jex8SPW1eT2"
+			]
+		},
+		"@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol": {
+			"keccak256": "0xdb4d24ee2c087c391d587cd17adfe5b3f9d93b3110b1388c2ab6c7c0ad1dcd05",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://ab7b6d5b9e2b88176312967fe0f0e78f3d9a1422fa5e4b64e2440c35869b5d08",
+				"dweb:/ipfs/QmXKYWWyzcLg1B2k7Sb1qkEXgLCYfXecR9wYW5obRzWP1Q"
+			]
+		},
+		"@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol": {
+			"keccak256": "0xdbef5f0c787055227243a7318ef74c8a5a1108ca3a07f2b3a00ef67769e1e397",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://08e39f23d5b4692f9a40803e53a8156b72b4c1f9902a88cd65ba964db103dab9",
+				"dweb:/ipfs/QmPKn6EYDgpga7KtpkA8wV2yJCYGMtc9K4LkJfhKX2RVSV"
+			]
+		},
+		"@openzeppelin/contracts-upgradeable/utils/introspection/ERC165Upgradeable.sol": {
+			"keccak256": "0x6694b63ddb2c59bbe341c846171798350e8f72fa02189fcdeaca864e28b54e1f",
+			"license": "MIT",
+			"urls": [
+				"bzz-raw://7d945d33e2189ac4e531e4ed228f59ca957b3898c4f9051f4b8c7ae44d72b23a",
+				"dweb:/ipfs/QmRcEwubTe3xyXxthijs5fVzEgUFSxeddjd5PGfhBnkunX"
 			]
 		},
 		"@openzeppelin/contracts/access/IAccessControl.sol": {
@@ -778,14 +840,6 @@
 			"urls": [
 				"bzz-raw://b308f882e796f7b79c9502deacb0a62983035c6f6f4e962b319ba6a1f4a77d3d",
 				"dweb:/ipfs/QmaWCW7ahEQqFjwhSUhV7Ae7WhfNvzSpE7DQ58hvEooqPL"
-			]
-		},
-		"@openzeppelin/contracts/access/extensions/AccessControlEnumerable.sol": {
-			"keccak256": "0xebbd708d0f1d7d4f7393d28ef08188a4bbdaf8fb0dcc26a7cf6033092186b021",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://5fb72338ae25e88565b102a64ac5862e2826cb08d5b7e6af5990423ce487e7b9",
-				"dweb:/ipfs/QmVBCtrxBJ6ZtkFPkuevTxsa6hKAZiSHKDXi6a7SCZNFyV"
 			]
 		},
 		"@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol": {
@@ -860,14 +914,6 @@
 				"dweb:/ipfs/QmeBpvcdGWzWMKTQESUCEhHgnEQYYATVwPxLMxa6vMT7jC"
 			]
 		},
-		"@openzeppelin/contracts/utils/Context.sol": {
-			"keccak256": "0x493033a8d1b176a037b2cc6a04dad01a5c157722049bbecf632ca876224dd4b2",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://6a708e8a5bdb1011c2c381c9a5cfd8a9a956d7d0a9dc1bd8bcdaf52f76ef2f12",
-				"dweb:/ipfs/Qmax9WHBnVsZP46ZxEMNRQpLQnrdE4dK8LehML1Py8FowF"
-			]
-		},
 		"@openzeppelin/contracts/utils/Panic.sol": {
 			"keccak256": "0xf7fe324703a64fc51702311dc51562d5cb1497734f074e4f483bfb6717572d7a",
 			"license": "MIT",
@@ -890,14 +936,6 @@
 			"urls": [
 				"bzz-raw://9f660b1f351b757dfe01438e59888f31f33ded3afcf5cb5b0d9bf9aa6f320a8b",
 				"dweb:/ipfs/QmarDJ5hZEgBtCmmrVzEZWjub9769eD686jmzb2XpSU1cM"
-			]
-		},
-		"@openzeppelin/contracts/utils/introspection/ERC165.sol": {
-			"keccak256": "0x2d9dc2fe26180f74c11c13663647d38e259e45f95eb88f57b61d2160b0109d3e",
-			"license": "MIT",
-			"urls": [
-				"bzz-raw://81233d1f98060113d9922180bb0f14f8335856fe9f339134b09335e9f678c377",
-				"dweb:/ipfs/QmWh6R35SarhAn4z2wH8SU456jJSYL2FgucfTFgbHJJN4E"
 			]
 		},
 		"@openzeppelin/contracts/utils/introspection/IERC165.sol": {
@@ -933,11 +971,11 @@
 			]
 		},
 		"src/AviatorRewardsVault.sol": {
-			"keccak256": "0xd487ae61f27fa65f757d5b190d68752a0f3f8678b0a96db99df36742dd05532c",
+			"keccak256": "0x7e3e994b15418cae5925fedd56992bb1be70f6f6d1e51051d0e3c26b4f36a9ce",
 			"license": "MIT",
 			"urls": [
-				"bzz-raw://3a4f946e601fdbdbf9f20e7708c94bb4b10119f34ada70aadef68c272782d7ea",
-				"dweb:/ipfs/QmPURMCR9TSDf4y4X6z1wtFhheN3TrweBbU4yyUML4LtY1"
+				"bzz-raw://814007ca6cf9ac31660a89ac53b6bcd36b18eff52117f360942579b9085b3784",
+				"dweb:/ipfs/QmfLvJmd8Gxj3LnD2Fkr6BPnSjhH3sdsgAvS2pHxR94E51"
 			]
 		}
 	},
